@@ -131,3 +131,15 @@ def test_register_browsers(tmp_path, monkeypatch):
     assert json.loads(firefox.read_text())["allowed_extensions"] == [browsers.FIREFOX_EXTENSION_ID]
     # Unchanged manifests are not rewritten.
     assert browsers.register("/usr/libexec/linux-passkey/native-host", home=str(home)) == []
+
+
+def test_register_browsers_from_a_snap(tmp_path, monkeypatch):
+    real = tmp_path / "real"
+    (real / ".config" / "google-chrome").mkdir(parents=True)
+    monkeypatch.setenv("SNAP_REAL_HOME", str(real))
+    monkeypatch.setenv("HOME", str(tmp_path / "snap-home"))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "snap-home" / ".config"))
+    written = browsers.register("/snap/bin/linux-passkey.native-host")
+    assert written == [
+        str(real / ".config/google-chrome/NativeMessagingHosts" / (browsers.HOST_NAME + ".json"))
+    ]

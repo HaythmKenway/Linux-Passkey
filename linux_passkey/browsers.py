@@ -60,8 +60,14 @@ def manifests(host_path):
 
 def host_folders(home=None):
     """Yield (folder, kind) for each browser installed for this user."""
-    home = home or os.path.expanduser("~")
-    config = os.environ.get("XDG_CONFIG_HOME") or os.path.join(home, ".config")
+    if home is None and os.environ.get("SNAP_REAL_HOME"):
+        # In a snap, HOME and XDG_CONFIG_HOME are the snap's own folders; the
+        # browsers read the user's real ones (the personal-files plug).
+        home = os.environ["SNAP_REAL_HOME"]
+        config = os.path.join(home, ".config")
+    else:
+        home = home or os.path.expanduser("~")
+        config = os.environ.get("XDG_CONFIG_HOME") or os.path.join(home, ".config")
     for name in CHROMIUM_BROWSERS:
         if os.path.isdir(os.path.join(config, name)):
             yield os.path.join(config, name, "NativeMessagingHosts"), "chromium"

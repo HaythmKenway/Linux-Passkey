@@ -167,7 +167,8 @@ class Daemon:
     def register_browsers(self):
         """Point the browsers' extension at our native messaging host."""
         host = os.environ.get("PASSKEY_NATIVE_HOST", "")
-        if not os.access(host, os.X_OK):
+        # A snap's /snap/bin command is outside its confinement view.
+        if not host or (not os.environ.get("SNAP") and not os.access(host, os.X_OK)):
             log.info("no native messaging host installed; the browser extension is unavailable")
             return
         try:

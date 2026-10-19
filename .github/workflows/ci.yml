@@ -95,6 +95,41 @@ jobs:
           path: dist/*
           if-no-files-found: error
 
+  snap:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    outputs:
+      snap: ${{ steps.build.outputs.snap }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: snapcore/action-build@v1
+        id: build
+      - uses: actions/upload-artifact@v7
+        with:
+          name: snap
+          path: ${{ steps.build.outputs.snap }}
+          if-no-files-found: error
+
+  # The Snap Store: every push to main goes to edge, a version tag to
+  # candidate (promote it to stable from the Store dashboard). Needs the
+  # SNAPCRAFT_STORE_CREDENTIALS secret (snapcraft export-login).
+  snap-publish:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    needs: [lint, test, snap]
+    environment: snap-store
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: snap
+      - uses: snapcore/action-publish@v1
+        env:
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
+        with:
+          snap: ${{ needs.snap.outputs.snap }}
+          release: ${{ startsWith(github.ref, 'refs/tags/v') && 'candidate' || 'edge' }}
+
   release:
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-24.04
