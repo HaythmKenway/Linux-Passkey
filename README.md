@@ -60,7 +60,7 @@ Then log out and back in, or open **Passkeys** once, to start the service, and a
 
 ### From the Debian packages (Debian, Ubuntu and derivatives)
 
-Download both `.deb` files from the [latest release](https://github.com/HaythmKenway/Ubuntu-Passkey/releases), then:
+Download both `.deb` files from the [latest release](https://github.com/HaythmKenway/Linux-Passkey/releases), then:
 
 ```sh
 sudo apt install ./linux-passkey_*_all.deb ./gnome-shell-extension-linux-passkey_*_all.deb
@@ -212,10 +212,10 @@ Bus name `io.github.haythmkenway.Passkey.Daemon`, object `/io/github/haythmkenwa
 
 Bug reports, test results from your distribution and browser, translations and code are all welcome.
 
-- **Report a problem:** [open an issue](https://github.com/HaythmKenway/Ubuntu-Passkey/issues) with your distribution, desktop, browser, how you installed Linux Passkey, and the output of `journalctl --user -u linux-passkey -b | tail -50`.
+- **Report a problem:** [open an issue](https://github.com/HaythmKenway/Linux-Passkey/issues) with your distribution, desktop, browser, how you installed Linux Passkey, and the output of `journalctl --user -u linux-passkey -b | tail -50`.
 - **Send a change:** fork the repository, make your change on a branch, run `make check` and `make lint`, and open a pull request. Add a test for every fix; CI runs the suite on Ubuntu 22.04 and 24.04 and builds the packages and the snap.
 - **Translate:** see [Translations](#translations).
-- **Security issues:** please report them privately through [GitHub's security advisories](https://github.com/HaythmKenway/Ubuntu-Passkey/security/advisories/new) rather than in a public issue.
+- **Security issues:** please report them privately through [GitHub's security advisories](https://github.com/HaythmKenway/Linux-Passkey/security/advisories/new) rather than in a public issue.
 
 ## Support the project
 

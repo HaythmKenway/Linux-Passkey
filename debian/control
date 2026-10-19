@@ -4,7 +4,7 @@ Priority: optional
 Maintainer: Linux Passkey contributors <noreply@github.com>
 Build-Depends: debhelper-compat (= 13), dh-python, python3:any
 Standards-Version: 4.6.2
-Homepage: https://github.com/HaythmKenway/Ubuntu-Passkey
+Homepage: https://github.com/HaythmKenway/Linux-Passkey
 Rules-Requires-Root: no
 
 Package: linux-passkey

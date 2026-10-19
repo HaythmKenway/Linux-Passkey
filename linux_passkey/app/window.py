@@ -316,7 +316,7 @@ class PasskeyWindow(Adw.ApplicationWindow):
 
     def _open_help(self):
         Gtk.UriLauncher.new(
-            "https://github.com/HaythmKenway/Ubuntu-Passkey#troubleshooting"
+            "https://github.com/HaythmKenway/Linux-Passkey#troubleshooting"
         ).launch(self, None, None, None)
 
     def on_delete(self, button, cred):

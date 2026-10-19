@@ -39,8 +39,8 @@ class PasskeyApplication(Adw.Application):
             application_icon=APP_ID,
             developer_name=_("Linux Passkey contributors"),
             version=__version__,
-            website="https://github.com/HaythmKenway/Ubuntu-Passkey",
-            issue_url="https://github.com/HaythmKenway/Ubuntu-Passkey/issues",
+            website="https://github.com/HaythmKenway/Linux-Passkey",
+            issue_url="https://github.com/HaythmKenway/Linux-Passkey/issues",
             license_type=Gtk.License.GPL_3_0,
             comments=_("Passkeys for Linux: a FIDO2 authenticator built into your desktop."),
         )

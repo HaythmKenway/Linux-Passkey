@@ -44,8 +44,8 @@ Snapshot after the second development session. The work is merged into `main`.
 ## Test plan for your system (Ubuntu 24.04 desktop)
 
 ```sh
-git clone https://github.com/HaythmKenway/Ubuntu-Passkey
-cd Ubuntu-Passkey
+git clone https://github.com/HaythmKenway/Linux-Passkey
+cd Linux-Passkey
 sudo apt install build-essential debhelper dh-python python3-all gettext
 make deb
 sudo apt install ../linux-passkey_0.1.0_all.deb ../gnome-shell-extension-linux-passkey_0.1.0_all.deb

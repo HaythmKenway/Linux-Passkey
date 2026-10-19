@@ -1,6 +1,6 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: linux-passkey
-Source: https://github.com/HaythmKenway/Ubuntu-Passkey
+Source: https://github.com/HaythmKenway/Linux-Passkey
 
 Files: *
 Copyright: 2026 Linux Passkey contributors

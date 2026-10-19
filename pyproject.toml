@@ -21,7 +21,7 @@ passkeyd = "linux_passkey.daemon:main"
 linux-passkey = "linux_passkey.app.main:main"
 
 [project.urls]
-Homepage = "https://github.com/HaythmKenway/Ubuntu-Passkey"
+Homepage = "https://github.com/HaythmKenway/Linux-Passkey"
 
 [tool.setuptools]
 packages = ["linux_passkey", "linux_passkey.app"]

@@ -44,12 +44,12 @@ description: |
     sudo snap connect linux-passkey:browser-hosts
 
   The snap does not include the virtual USB security key for browsers without the extension; the .deb from the project's releases does.
-website: https://github.com/HaythmKenway/Ubuntu-Passkey
-source-code: https://github.com/HaythmKenway/Ubuntu-Passkey
-issues: https://github.com/HaythmKenway/Ubuntu-Passkey/issues
+website: https://github.com/HaythmKenway/Linux-Passkey
+source-code: https://github.com/HaythmKenway/Linux-Passkey
+issues: https://github.com/HaythmKenway/Linux-Passkey/issues
 donation:
   - https://paypal.me/0x4kil
-  - https://github.com/HaythmKenway/Ubuntu-Passkey#support-the-project
+  - https://github.com/HaythmKenway/Linux-Passkey#support-the-project
 license: GPL-3.0-or-later
 icon: data/icons/hicolor/scalable/apps/io.github.haythmkenway.Passkey.svg
 base: core24

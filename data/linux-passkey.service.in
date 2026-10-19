@@ -1,6 +1,6 @@
 [Unit]
 Description=Linux Passkey authenticator
-Documentation=https://github.com/HaythmKenway/Ubuntu-Passkey
+Documentation=https://github.com/HaythmKenway/Linux-Passkey
 PartOf=graphical-session.target
 After=graphical-session.target
 

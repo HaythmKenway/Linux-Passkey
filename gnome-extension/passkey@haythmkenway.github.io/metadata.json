@@ -3,7 +3,7 @@
   "name": "Linux Passkey",
   "description": "Passkeys for your desktop. Shows approval prompts when a website wants to create or use a passkey stored by Linux Passkey, and adds a status menu to the top bar.\n\nRequires the Linux Passkey service (the 'linux-passkey' package).",
   "shell-version": ["45", "46", "47", "48", "49"],
-  "url": "https://github.com/HaythmKenway/Ubuntu-Passkey",
+  "url": "https://github.com/HaythmKenway/Linux-Passkey",
   "gettext-domain": "linux-passkey",
   "version-name": "0.1.0"
 }
