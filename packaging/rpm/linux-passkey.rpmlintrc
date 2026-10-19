@@ -8,3 +8,5 @@ addFilter("no-documentation")
 # openSUSE's whitelist for polkit actions covers its own distribution only;
 # auth_self (the user's own password, never cached) is what verification needs.
 addFilter("polkit-user-privilege")
+# One file serves both families, so some filters go unused on each.
+addFilter("unused-rpmlintrc-filter")
