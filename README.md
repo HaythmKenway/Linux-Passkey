@@ -80,7 +80,7 @@ sudo zypper install linux-passkey gnome-shell-extension-linux-passkey
 
 ```sh
 curl -fsSL https://packages.akileswar.com/linux-passkey/linux-passkey.asc -o /tmp/linux-passkey.asc
-sudo pacman-key --add /tmp/linux-passkey.asc && sudo pacman-key --lsign-key 392A1EEB594EC9FB0300BC66A1AE3F549366D3D9
+sudo pacman-key --add /tmp/linux-passkey.asc && sudo pacman-key --lsign-key FB5BE1AC6C71ABFCFC0D044770E8F24E37F2D8CC
 printf '\n[linux-passkey]\nServer = https://packages.akileswar.com/linux-passkey/arch\n' | sudo tee -a /etc/pacman.conf
 sudo pacman -Sy linux-passkey gnome-shell-extension-linux-passkey
 systemctl --user enable --now linux-passkey.service
