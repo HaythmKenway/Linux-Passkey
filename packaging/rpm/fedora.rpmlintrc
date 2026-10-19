@@ -1,0 +1,7 @@
+# Known and accepted on Fedora; anything else fails CI.
+# Words of the trade that the dictionary lacks.
+addFilter("spelling-error")
+# Introspection typelibs are loaded at run time; a noarch package names the libraries.
+addFilter("explicit-lib-dependency")
+# The extension is documented by linux-passkey, which it requires.
+addFilter("no-documentation")
