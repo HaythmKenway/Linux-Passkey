@@ -10,6 +10,7 @@ DESTDIR ?=
 PYTHON ?= python3
 
 bindir = $(PREFIX)/bin
+libexecdir = $(PREFIX)/libexec/ubuntu-passkey
 datadir = $(PREFIX)/share
 pkgdatadir = $(datadir)/ubuntu-passkey
 # udev, systemd, modules-load and polkit only look in /usr and /etc.
@@ -20,7 +21,7 @@ EXTENSION_UUID = passkey@haythmkenway.github.io
 EXTENSION_DIR = gnome-extension/$(EXTENSION_UUID)
 VERSION = $(shell $(PYTHON) -c 'import ubuntu_passkey; print(ubuntu_passkey.__version__)')
 
-SUBST = sed -e 's|@bindir@|$(bindir)|g' -e 's|@pkgdatadir@|$(pkgdatadir)|g'
+SUBST = sed -e 's|@bindir@|$(bindir)|g' -e 's|@pkgdatadir@|$(pkgdatadir)|g' -e 's|@libexecdir@|$(libexecdir)|g'
 
 LINGUAS = $(shell cat po/LINGUAS 2>/dev/null)
 
@@ -36,6 +37,9 @@ lint:
 	$(PYTHON) -m pyflakes ubuntu_passkey tests
 	for f in $(EXTENSION_DIR)/*.js; do cp $$f /tmp/ubuntu-passkey-check.mjs && node --check /tmp/ubuntu-passkey-check.mjs || exit 1; done
 	cd gnome-extension && npx --yes eslint@9.15.0 $(EXTENSION_UUID)/*.js
+	for f in browser-extension/*.js; do node --check $$f || exit 1; done
+	cd browser-extension && npx --yes eslint@9.15.0 *.js
+	$(PYTHON) -c 'import json; json.load(open("browser-extension/manifest.json"))'
 	desktop-file-validate data/io.github.haythmkenway.Passkey.desktop
 	appstreamcli validate --no-net data/io.github.haythmkenway.Passkey.metainfo.xml
 	xmllint --noout --dtdvalid /usr/share/polkit-1/policyconfig-1.dtd data/io.github.haythmkenway.passkey.policy
@@ -65,6 +69,12 @@ install-app:
 	$(SUBST) bin/passkeyd.in > $(DESTDIR)$(bindir)/passkeyd
 	$(SUBST) bin/ubuntu-passkey.in > $(DESTDIR)$(bindir)/ubuntu-passkey
 	chmod 755 $(DESTDIR)$(bindir)/passkeyd $(DESTDIR)$(bindir)/ubuntu-passkey
+	install -d $(DESTDIR)$(libexecdir)
+	$(SUBST) bin/native-host.in > $(DESTDIR)$(libexecdir)/native-host
+	chmod 755 $(DESTDIR)$(libexecdir)/native-host
+	install -d $(DESTDIR)$(pkgdatadir)/browser-extension
+	install -m 644 browser-extension/manifest.json browser-extension/*.js browser-extension/*.png \
+		$(DESTDIR)$(pkgdatadir)/browser-extension/
 	install -d $(DESTDIR)$(libdir_sys)/systemd/user
 	$(SUBST) data/ubuntu-passkey.service.in > $(DESTDIR)$(libdir_sys)/systemd/user/ubuntu-passkey.service
 	install -d $(DESTDIR)$(datadir)/dbus-1/services
@@ -88,6 +98,7 @@ install-extension:
 uninstall:
 	rm -rf $(DESTDIR)$(pkgdatadir) $(DESTDIR)$(datadir)/gnome-shell/extensions/$(EXTENSION_UUID)
 	rm -f $(DESTDIR)$(bindir)/passkeyd $(DESTDIR)$(bindir)/ubuntu-passkey
+	rm -rf $(DESTDIR)$(libexecdir)
 	rm -f $(DESTDIR)$(datadir)/man/man1/passkeyd.1 $(DESTDIR)$(datadir)/man/man1/ubuntu-passkey.1
 	rm -f $(DESTDIR)$(libdir_sys)/systemd/user/ubuntu-passkey.service
 	rm -f $(DESTDIR)$(datadir)/dbus-1/services/io.github.haythmkenway.Passkey.Daemon.service

@@ -256,6 +256,7 @@ class Authenticator:
         self._token = None
         self.key_agreement = KeyAgreement()
         self.powered_up = time.monotonic()
+        self._lock = threading.Lock()
 
     # -- helpers ----------------------------------------------------------
 
@@ -349,6 +350,31 @@ class Authenticator:
 
     # -- dispatch ---------------------------------------------------------
 
+    def execute(self, cmd, params, request):
+        """Run one command on decoded parameters; raises CtapError.
+
+        Commands are serialized: the USB device and the browser extension
+        share this authenticator and its getNextAssertion/token state.
+        """
+        handler = {
+            CMD_MAKE_CREDENTIAL: self.make_credential,
+            CMD_GET_ASSERTION: self.get_assertion,
+            CMD_GET_INFO: self.get_info,
+            CMD_CLIENT_PIN: self.client_pin,
+            CMD_RESET: self.reset,
+            CMD_GET_NEXT_ASSERTION: self.get_next_assertion,
+            CMD_SELECTION: self.selection,
+            CMD_CREDENTIAL_MANAGEMENT: self.credential_management,
+        }.get(cmd)
+        if handler is None:
+            raise CtapError(ERR_INVALID_COMMAND, "unsupported command 0x%02x" % cmd)
+        with self._lock:
+            if cmd != CMD_GET_NEXT_ASSERTION:
+                self._next = None
+            if cmd != CMD_CREDENTIAL_MANAGEMENT:
+                self._cm_state = None
+            return handler(params, request)
+
     def process(self, data, request=None):
         """Process one CTAP2 message; return status byte + CBOR response."""
         request = request or Request()
@@ -364,23 +390,7 @@ class Authenticator:
                     raise CtapError(ERR_INVALID_CBOR, "invalid CBOR")
                 if not isinstance(params, dict):
                     raise CtapError(ERR_CBOR_UNEXPECTED_TYPE, "expected a map")
-            handler = {
-                CMD_MAKE_CREDENTIAL: self.make_credential,
-                CMD_GET_ASSERTION: self.get_assertion,
-                CMD_GET_INFO: self.get_info,
-                CMD_CLIENT_PIN: self.client_pin,
-                CMD_RESET: self.reset,
-                CMD_GET_NEXT_ASSERTION: self.get_next_assertion,
-                CMD_SELECTION: self.selection,
-                CMD_CREDENTIAL_MANAGEMENT: self.credential_management,
-            }.get(cmd)
-            if handler is None:
-                raise CtapError(ERR_INVALID_COMMAND, "unsupported command 0x%02x" % cmd)
-            if cmd != CMD_GET_NEXT_ASSERTION:
-                self._next = None
-            if cmd != CMD_CREDENTIAL_MANAGEMENT:
-                self._cm_state = None
-            result = handler(params, request)
+            result = self.execute(cmd, params, request)
         except CtapError as e:
             log.info("command 0x%02x failed: %s", cmd, e)
             return bytes([e.code])

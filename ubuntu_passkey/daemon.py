@@ -13,7 +13,7 @@ import gi
 gi.require_version("Gio", "2.0")
 from gi.repository import GLib  # noqa: E402
 
-from . import __version__  # noqa: E402
+from . import __version__, browsers  # noqa: E402
 from .broker import ApprovalBroker  # noqa: E402
 from .config import Config  # noqa: E402
 from .ctap2 import ERR_NOT_ALLOWED, Authenticator  # noqa: E402
@@ -164,6 +164,17 @@ class Daemon:
             "key_backend": self.keys.backend_name,
         }
 
+    def register_browsers(self):
+        """Point the browsers' extension at our native messaging host."""
+        host = os.environ.get("PASSKEY_NATIVE_HOST", "")
+        if not os.access(host, os.X_OK):
+            log.info("no native messaging host installed; the browser extension is unavailable")
+            return
+        try:
+            browsers.register(host)
+        except OSError as e:
+            log.warning("cannot register the browser extension host: %s", e)
+
     def run(self):
         self.loop = loop = GLib.MainLoop()
 
@@ -173,6 +184,7 @@ class Daemon:
 
         self.service.own_name(name_lost)
         self.open_store()
+        self.register_browsers()
         for signum in (signal.SIGINT, signal.SIGTERM):
             GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signum, loop.quit)
         loop.run()

@@ -1,5 +1,6 @@
 """D-Bus interface of the passkey daemon (session bus)."""
 
+import json
 import logging
 import threading
 
@@ -8,10 +9,14 @@ import gi
 gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
-from . import DBUS_INTERFACE, DBUS_NAME, DBUS_PATH, __version__  # noqa: E402
+from . import DBUS_INTERFACE, DBUS_NAME, DBUS_PATH, __version__, webauthn  # noqa: E402
 from .ctap2 import Cancelled, Prompt, Request, Timeout, describe_record  # noqa: E402
 
 log = logging.getLogger(__name__)
+
+# WebAuthn errors reach the browser extension as these D-Bus error names; the
+# part after the last dot is the DOMException name the website sees.
+WEBAUTHN_ERROR = "io.github.haythmkenway.Passkey.WebAuthn."
 
 INTERFACE_XML = """
 <node>
@@ -39,6 +44,28 @@ INTERFACE_XML = """
     </method>
     <method name="GetStatus">
       <arg type="a{sv}" name="status" direction="out"/>
+    </method>
+    <method name="WebAuthnCreate">
+      <arg type="s" name="origin" direction="in"/>
+      <arg type="s" name="top_origin" direction="in"/>
+      <arg type="s" name="options" direction="in"/>
+      <arg type="s" name="handle" direction="in"/>
+      <arg type="s" name="credential" direction="out"/>
+    </method>
+    <method name="WebAuthnGet">
+      <arg type="s" name="origin" direction="in"/>
+      <arg type="s" name="top_origin" direction="in"/>
+      <arg type="s" name="options" direction="in"/>
+      <arg type="s" name="handle" direction="in"/>
+      <arg type="s" name="credential" direction="out"/>
+    </method>
+    <method name="WebAuthnHasCredentials">
+      <arg type="s" name="origin" direction="in"/>
+      <arg type="s" name="options" direction="in"/>
+      <arg type="b" name="found" direction="out"/>
+    </method>
+    <method name="WebAuthnCancel">
+      <arg type="s" name="handle" direction="in"/>
     </method>
     <method name="GetSettings">
       <arg type="a{sv}" name="settings" direction="out"/>
@@ -72,6 +99,10 @@ SIGNAL_TYPES = {
 }
 
 
+def _json(value):
+    return json.dumps(value, separators=(",", ":"))
+
+
 def _variant(value):
     if isinstance(value, bool):
         return GLib.Variant("b", value)
@@ -92,6 +123,8 @@ class PasskeyService:
         self._registration = None
         self._owner_id = 0
         self._watches = {}
+        self._ceremonies = {}  # (sender, handle) -> cancel event
+        self._ceremonies_lock = threading.Lock()
         self._node = Gio.DBusNodeInfo.new_for_xml(INTERFACE_XML)
         self.broker.emit = self.emit
 
@@ -252,6 +285,77 @@ class PasskeyService:
         invocation.return_value(
             GLib.Variant("(a{sv})", ({k: _variant(v) for k, v in status.items()},))
         )
+
+    # -- WebAuthn (browser extension) ------------------------------------
+
+    def _m_WebAuthnCreate(self, sender, args, invocation):
+        self._ceremony(sender, args, invocation, webauthn.create)
+
+    def _m_WebAuthnGet(self, sender, args, invocation):
+        self._ceremony(sender, args, invocation, webauthn.get)
+
+    def _ceremony(self, sender, args, invocation, run):
+        origin, top_origin, options, handle = args
+        authenticator = self.daemon.authenticator
+        if authenticator is None:
+            raise RuntimeError("passkey storage is unavailable: %s" % self.daemon.store_error)
+        options = self._options(options)
+        request = Request()
+        key = (sender, handle)
+        with self._ceremonies_lock:
+            if key in self._ceremonies:
+                raise ValueError("handle %r is already in use" % handle)
+            self._ceremonies[key] = request.cancel
+
+        # Approval and verification block, so the ceremony runs off the main loop.
+        def work():
+            try:
+                result = run(authenticator, origin, options, request, top_origin or None)
+                reply = ("(s)", (_json(result),))
+            except webauthn.WebAuthnError as e:
+                reply = (WEBAUTHN_ERROR + e.name, str(e))
+            except Exception as e:
+                log.exception("WebAuthn ceremony failed")
+                reply = (WEBAUTHN_ERROR + "UnknownError", str(e))
+            finally:
+                with self._ceremonies_lock:
+                    self._ceremonies.pop(key, None)
+
+            def finish():
+                if reply[0].startswith("("):
+                    invocation.return_value(GLib.Variant(*reply))
+                else:
+                    invocation.return_dbus_error(*reply)
+
+            GLib.idle_add(finish)
+
+        threading.Thread(target=work, name="webauthn", daemon=True).start()
+
+    def _m_WebAuthnHasCredentials(self, sender, args, invocation):
+        origin, options = args
+        options = self._options(options)
+        try:
+            found = webauthn.has_credentials(self.daemon.require_store(), origin, options)
+        except webauthn.WebAuthnError as e:
+            invocation.return_dbus_error(WEBAUTHN_ERROR + e.name, str(e))
+            return
+        invocation.return_value(GLib.Variant("(b)", (found,)))
+
+    def _m_WebAuthnCancel(self, sender, args, invocation):
+        (handle,) = args
+        # Only the caller that started a ceremony can cancel it.
+        with self._ceremonies_lock:
+            cancel = self._ceremonies.get((sender, handle))
+        if cancel is not None:
+            cancel.set()
+        invocation.return_value(None)
+
+    @staticmethod
+    def _options(text):
+        try:
+            return json.loads(text)
+        except ValueError:
+            raise ValueError("options are not valid JSON")
 
     def _m_GetSettings(self, sender, args, invocation):
         settings = self.daemon.config.as_dict()
