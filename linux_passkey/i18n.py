@@ -2,7 +2,7 @@
 
 import gettext
 
-DOMAIN = "ubuntu-passkey"
+DOMAIN = "linux-passkey"
 
 _translation = gettext.translation(DOMAIN, fallback=True)
 _ = _translation.gettext

@@ -8,7 +8,7 @@ from gi.repository import Adw, Gio, GLib, GObject, Gtk
 from ..i18n import _, ngettext
 from .client import DaemonClient
 
-SERVICE = "ubuntu-passkey.service"
+SERVICE = "linux-passkey.service"
 
 
 def _ago(ts):

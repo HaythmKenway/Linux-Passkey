@@ -1,7 +1,7 @@
 """WebAuthn client for the platform authenticator path.
 
 Browsers on Linux have no operating system WebAuthn API to call, so the
-Ubuntu Passkey browser extension takes ``navigator.credentials.create/get``
+Linux Passkey browser extension takes ``navigator.credentials.create/get``
 calls and hands them to the daemon (through the native messaging host).
 That makes this module the WebAuthn *client*: it does what the browser
 would otherwise do before talking to an authenticator (WebAuthn Level 3,

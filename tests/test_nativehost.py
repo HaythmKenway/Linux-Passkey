@@ -18,7 +18,7 @@ from fido2.webauthn import (  # noqa: E402
 )
 
 from conftest import FakeUI, connect, needs_dbus  # noqa: E402
-from ubuntu_passkey import browsers, ctap2, nativehost  # noqa: E402
+from linux_passkey import browsers, ctap2, nativehost  # noqa: E402
 
 ORIGIN = "https://example.com"
 

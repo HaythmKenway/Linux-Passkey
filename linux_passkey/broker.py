@@ -121,10 +121,10 @@ class ApprovalBroker:
         return pending.choice
 
     def _fallback_command(self):
-        exe = shutil.which("ubuntu-passkey")
+        exe = shutil.which("linux-passkey")
         if exe:
             return [exe, "--prompt"]
-        return [sys.executable, "-m", "ubuntu_passkey.app", "--prompt"]
+        return [sys.executable, "-m", "linux_passkey.app", "--prompt"]
 
     def _confirm_fallback(self, prompt, request, timeout):
         if not (os.environ.get("WAYLAND_DISPLAY") or os.environ.get("DISPLAY")):

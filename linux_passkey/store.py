@@ -80,6 +80,9 @@ class CredentialStore:
     # -- keys -------------------------------------------------------------
 
     def _set_master(self, master_key):
+        # These labels date from the project's first name. They are part of
+        # the key derivation: changing them would make every stored passkey
+        # unreadable, so they stay as they are.
         self._wrap = AESGCM(_derive(master_key, b"ubuntu-passkey credential wrap"))
         self._seal = AESGCM(_derive(master_key, b"ubuntu-passkey store"))
 

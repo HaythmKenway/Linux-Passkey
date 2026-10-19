@@ -11,8 +11,8 @@ gi = pytest.importorskip("gi")
 gi.require_version("Gio", "2.0")
 from gi.repository import GLib  # noqa: E402
 
-from ubuntu_passkey import cbor  # noqa: E402
-from ubuntu_passkey.ctap2 import Request  # noqa: E402
+from linux_passkey import cbor  # noqa: E402
+from linux_passkey.ctap2 import Request  # noqa: E402
 
 from conftest import call, connect, name_has_owner, needs_dbus, wait_for_state  # noqa: E402
 
@@ -118,8 +118,8 @@ def test_settings(daemon):
 def test_unreadable_store_is_reported_and_recoverable(bus, env, monkeypatch):
     """A store that cannot be decrypted must not crash the daemon: it reports
     the problem, keeps the file aside on reset and starts working again."""
-    from ubuntu_passkey import paths
-    from ubuntu_passkey.daemon import Daemon
+    from linux_passkey import paths
+    from linux_passkey.daemon import Daemon
 
     monkeypatch.delenv("DISPLAY", raising=False)
     monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)
@@ -168,7 +168,7 @@ def test_fallback_prompt_receives_request_on_stdin(daemon, monkeypatch, tmp_path
     import json
     import sys
 
-    from ubuntu_passkey.ctap2 import Prompt
+    from linux_passkey.ctap2 import Prompt
 
     script = tmp_path / "prompt.py"
     record = tmp_path / "seen.json"

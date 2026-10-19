@@ -17,8 +17,8 @@ from fido2.webauthn import (  # noqa: E402
     UserVerificationRequirement,
 )
 
-from ubuntu_passkey import ctap2, webauthn  # noqa: E402
-from ubuntu_passkey.webauthn import WebAuthnError  # noqa: E402
+from linux_passkey import ctap2, webauthn  # noqa: E402
+from linux_passkey.webauthn import WebAuthnError  # noqa: E402
 
 ORIGIN = "https://login.example.com"
 RP = PublicKeyCredentialRpEntity(id="example.com", name="Example")

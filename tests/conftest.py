@@ -9,10 +9,10 @@ import pytest
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ubuntu_passkey import DBUS_INTERFACE, DBUS_NAME, DBUS_PATH, ctap2  # noqa: E402
-from ubuntu_passkey.config import Config  # noqa: E402
-from ubuntu_passkey.ctaphid import CtapHidDevice  # noqa: E402
-from ubuntu_passkey.store import CredentialStore  # noqa: E402
+from linux_passkey import DBUS_INTERFACE, DBUS_NAME, DBUS_PATH, ctap2  # noqa: E402
+from linux_passkey.config import Config  # noqa: E402
+from linux_passkey.ctaphid import CtapHidDevice  # noqa: E402
+from linux_passkey.store import CredentialStore  # noqa: E402
 
 
 class FakeUI:
@@ -101,7 +101,7 @@ def hid_device(authenticator):
     from fido2.hid import CtapHidDevice as ClientDevice
     from fido2.hid.base import HidDescriptor
 
-    descriptor = HidDescriptor("loopback", 0x1209, 0x0001, 64, 64, "Ubuntu Passkey", "1")
+    descriptor = HidDescriptor("loopback", 0x1209, 0x0001, 64, 64, "Linux Passkey", "1")
     return ClientDevice(descriptor, LoopbackConnection(authenticator))
 
 
@@ -146,7 +146,7 @@ def bus():
 
 @pytest.fixture
 def daemon(bus, env, monkeypatch):
-    from ubuntu_passkey.daemon import Daemon
+    from linux_passkey.daemon import Daemon
 
     monkeypatch.delenv("DISPLAY", raising=False)
     monkeypatch.delenv("WAYLAND_DISPLAY", raising=False)

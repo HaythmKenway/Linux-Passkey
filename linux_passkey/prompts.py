@@ -37,7 +37,7 @@ TEXTS = {
         N_("Allow"),
     ),
     "select": (
-        N_("Use Ubuntu Passkey?"),
+        N_("Use Linux Passkey?"),
         N_("A website wants to use the passkeys on this device."),
         None,
         N_("Use"),
@@ -45,7 +45,7 @@ TEXTS = {
     "reset": (
         N_("Delete All Passkeys?"),
         N_(
-            "A website or app asked to reset Ubuntu Passkey. Every passkey "
+            "A website or app asked to reset Linux Passkey. Every passkey "
             "will be permanently deleted."
         ),
         None,

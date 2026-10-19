@@ -1,6 +1,6 @@
 """Stand-alone approval prompt used when the GNOME Shell extension is absent.
 
-Invoked by the daemon as ``ubuntu-passkey --prompt '<json>'``; prints
+Invoked by the daemon as ``linux-passkey --prompt '<json>'``; prints
 ``approve <index>`` and exits 0 when the user approves.
 """
 
@@ -18,7 +18,7 @@ DENY_EXIT = 1
 
 class PromptWindow(Adw.ApplicationWindow):
     def __init__(self, app, spec):
-        super().__init__(application=app, title=_("Ubuntu Passkey"))
+        super().__init__(application=app, title=_("Linux Passkey"))
         self.spec = spec
         self.result = None
         self.set_default_size(420, -1)

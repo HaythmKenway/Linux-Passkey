@@ -1,4 +1,4 @@
-"""Ubuntu Passkey: a software FIDO2 / WebAuthn authenticator for Ubuntu."""
+"""Linux Passkey: a software FIDO2 / WebAuthn authenticator for Linux."""
 
 __version__ = "0.1.0"
 

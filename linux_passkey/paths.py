@@ -6,7 +6,15 @@ import tempfile
 
 def _xdg(var, fallback):
     base = os.environ.get(var) or os.path.expanduser(fallback)
-    return os.path.join(base, "ubuntu-passkey")
+    path = os.path.join(base, "linux-passkey")
+    # The project was called Ubuntu Passkey before; carry its files over.
+    old = os.path.join(base, "ubuntu-passkey")
+    if not os.path.exists(path) and os.path.isdir(old):
+        try:
+            os.rename(old, path)
+        except OSError:
+            return old
+    return path
 
 
 def data_dir():

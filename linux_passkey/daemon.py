@@ -1,4 +1,4 @@
-"""passkeyd: the Ubuntu Passkey authenticator daemon."""
+"""passkeyd: the Linux Passkey authenticator daemon."""
 
 import argparse
 import logging
@@ -202,7 +202,7 @@ def _usb_id(text):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        prog="passkeyd", description="Ubuntu Passkey authenticator daemon"
+        prog="passkeyd", description="Linux Passkey authenticator daemon"
     )
     parser.add_argument("-v", "--verbose", action="store_true")
     parser.add_argument("--uhid", default=UHID_PATH, help="path to the uhid device")

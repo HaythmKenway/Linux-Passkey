@@ -97,7 +97,7 @@ class SecretServiceBackend:
                 self._schema,
                 {"purpose": "master-key"},
                 self._secret.COLLECTION_DEFAULT,
-                "Ubuntu Passkey master key",
+                "Linux Passkey master key",
                 base64.b64encode(key).decode(),
                 None,
             )

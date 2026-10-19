@@ -1,4 +1,4 @@
-"""Passkeys: the Ubuntu Passkey manager application."""
+"""Passkeys: the Linux Passkey manager application."""
 
 import sys
 
@@ -37,12 +37,12 @@ class PasskeyApplication(Adw.Application):
         about = Adw.AboutDialog(
             application_name="Passkeys",
             application_icon=APP_ID,
-            developer_name=_("Ubuntu Passkey contributors"),
+            developer_name=_("Linux Passkey contributors"),
             version=__version__,
             website="https://github.com/HaythmKenway/Ubuntu-Passkey",
             issue_url="https://github.com/HaythmKenway/Ubuntu-Passkey/issues",
             license_type=Gtk.License.GPL_3_0,
-            comments=_("Passkeys for Ubuntu: a FIDO2 authenticator built into your desktop."),
+            comments=_("Passkeys for Linux: a FIDO2 authenticator built into your desktop."),
         )
         about.present(self.props.active_window)
 

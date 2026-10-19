@@ -107,7 +107,7 @@ def missing_module_hint(path=UHID_PATH):
 class UhidDevice:
     """Creates the virtual device and pumps reports to/from ``on_output``."""
 
-    def __init__(self, on_output, name="Ubuntu Passkey", path=UHID_PATH, usb_id=None):
+    def __init__(self, on_output, name="Linux Passkey", path=UHID_PATH, usb_id=None):
         self.on_output = on_output
         self.vendor, self.product = usb_id or (VENDOR_ID, PRODUCT_ID)
         self.name = name
@@ -127,7 +127,7 @@ class UhidDevice:
                 raise UhidError(
                     e.errno,
                     "permission denied opening %s; install the udev rule shipped "
-                    "with Ubuntu Passkey and log in again" % self.path,
+                    "with Linux Passkey and log in again" % self.path,
                 )
             if e.errno == errno.ENOENT:
                 raise UhidError(e.errno, missing_module_hint(self.path))
@@ -137,7 +137,7 @@ class UhidDevice:
             self._fd,
             create2_event(
                 self.name,
-                "ubuntu-passkey",
+                "linux-passkey",
                 uniq,
                 FIDO_REPORT_DESCRIPTOR,
                 self.vendor,

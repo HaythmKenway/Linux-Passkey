@@ -3,6 +3,6 @@ import sys
 
 sys.path.insert(0, "@pkgdatadir@")
 
-from ubuntu_passkey.nativehost import main  # noqa: E402
+from linux_passkey.nativehost import main  # noqa: E402
 
 sys.exit(main())

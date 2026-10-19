@@ -1,4 +1,4 @@
-"""User configuration (~/.config/ubuntu-passkey/config.json)."""
+"""User configuration (~/.config/linux-passkey/config.json)."""
 
 import json
 import os
