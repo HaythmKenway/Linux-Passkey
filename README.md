@@ -1,5 +1,7 @@
 <div align="center">
 
+<img src="docs/hero.svg" alt="Linux Passkey: a website asks to create a passkey, and you approve it with your Linux password or fingerprint" width="100%">
+
 # Linux Passkey
 
 **Windows Hello-style passkeys for Linux.**
