@@ -3,6 +3,7 @@
 #   make check                 run the test suite
 #   sudo make install          install everything under /usr/local
 #   make extension-zip         build the GNOME Shell extension for extensions.gnome.org
+#   make browser-extension-zip build the browser extension for its stores
 #   make deb                   build Debian packages in ../
 
 PREFIX ?= /usr/local
@@ -25,7 +26,7 @@ SUBST = sed -e 's|@bindir@|$(bindir)|g' -e 's|@pkgdatadir@|$(pkgdatadir)|g' -e '
 
 LINGUAS = $(shell cat po/LINGUAS 2>/dev/null)
 
-.PHONY: all check lint pot install install-app install-locale install-extension uninstall extension-zip deb clean
+.PHONY: all check lint pot install install-app install-locale install-extension uninstall extension-zip browser-extension-zip deb clean
 
 all:
 	@echo "Nothing to build. Try 'make check' or 'sudo make install'."
@@ -34,7 +35,7 @@ check:
 	$(PYTHON) -m pytest -q tests
 
 lint:
-	$(PYTHON) -m pyflakes linux_passkey tests
+	$(PYTHON) -m pyflakes linux_passkey tests tools
 	for f in $(EXTENSION_DIR)/*.js; do cp $$f /tmp/linux-passkey-check.mjs && node --check /tmp/linux-passkey-check.mjs || exit 1; done
 	cd gnome-extension && npx --yes eslint@9.15.0 $(EXTENSION_UUID)/*.js
 	for f in browser-extension/*.js; do node --check $$f || exit 1; done
@@ -121,6 +122,9 @@ extension-zip:
 	done
 	cd build/extension && zip -qr ../../dist/$(EXTENSION_UUID).shell-extension.zip .
 	@echo "Built dist/$(EXTENSION_UUID).shell-extension.zip"
+
+browser-extension-zip:
+	$(PYTHON) tools/pack-extension.py dist
 
 deb:
 	dpkg-buildpackage -us -uc -b

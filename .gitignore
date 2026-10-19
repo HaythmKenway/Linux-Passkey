@@ -13,3 +13,4 @@ debian/tmp/
 debian/linux-passkey/
 debian/gnome-shell-extension-linux-passkey/
 debian/*.debhelper
+.venv/
