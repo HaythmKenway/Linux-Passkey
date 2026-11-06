@@ -10,7 +10,8 @@ window.addEventListener('message', event => {
     const data = event.data;
     if (event.source !== window || data?.linuxPasskey !== 'request')
         return;
-    const reply = message => window.postMessage({linuxPasskey: 'reply', id: data.id, ...message}, '*');
+    // Page IDs are local to each frame; native host IDs use a global sequence.
+    const reply = message => window.postMessage({...message, linuxPasskey: 'reply', id: data.id}, '*');
     let sent;
     try {
         sent = chrome.runtime.sendMessage({
