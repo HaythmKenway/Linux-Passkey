@@ -43,6 +43,7 @@ lint:
 	cd gnome-extension && npx --yes eslint@9.15.0 $(EXTENSION_UUID)/*.js
 	for f in browser-extension/*.js; do node --check $$f || exit 1; done
 	cd browser-extension && npx --yes eslint@9.15.0 *.js
+	node --test tests/test_browser_bridge.cjs
 	$(PYTHON) -c 'import json; json.load(open("browser-extension/manifest.json"))'
 	desktop-file-validate data/io.github.haythmkenway.Passkey.desktop
 	appstreamcli validate --no-net data/io.github.haythmkenway.Passkey.metainfo.xml
