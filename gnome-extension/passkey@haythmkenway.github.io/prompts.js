@@ -3,7 +3,7 @@ import {gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js'
 /**
  * Wording of approval prompts (mirrors linux_passkey/prompts.py).
  *
- * @param {string} operation register | authenticate | choose | exclude | select | reset
+ * @param {string} operation register | authenticate | choose | exclude | select | reset | import
  * @param {string} rpId relying party ID (website domain)
  * @param {string[]} accounts account labels
  * @returns {{title: string, body: string, action: string}}
@@ -11,6 +11,12 @@ import {gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js'
 export function describe(operation, rpId, accounts) {
     const rp = rpId || _('A website');
     switch (operation) {
+    case 'import':
+        return {
+            title: _('Import Bitwarden Passkeys?'),
+            body: _('%s. This creates independent local copies. Existing passkeys will be kept.').format(accounts?.[0] ?? ''),
+            action: _('Import'),
+        };
     case 'register': {
         const account = accounts?.[0];
         return {

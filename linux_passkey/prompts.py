@@ -6,6 +6,12 @@ The GNOME Shell extension has the same texts in prompts.js.
 from .i18n import N_, _
 
 TEXTS = {
+    "import": (
+        N_("Import Bitwarden Passkeys?"),
+        N_("{account}. This creates independent local copies. Existing passkeys will be kept."),
+        None,
+        N_("Import"),
+    ),
     "register": (
         N_("Create a Passkey?"),
         N_("{rp} wants to create a passkey for {account}."),

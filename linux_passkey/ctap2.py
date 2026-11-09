@@ -59,12 +59,14 @@ STATUS_UPNEEDED = 2
 # authenticatorData flags
 FLAG_UP = 0x01
 FLAG_UV = 0x04
+FLAG_BE = 0x08
+FLAG_BS = 0x10
 FLAG_AT = 0x40
 FLAG_ED = 0x80
 
 ALG_NAMES = {"ES256": keys.ES256, "EdDSA": keys.EDDSA}
 MAX_CRED_IDS_IN_LIST = 16
-MAX_CRED_ID_LENGTH = 128
+MAX_CRED_ID_LENGTH = 1023
 NEXT_ASSERTION_TIMEOUT = 30
 TOKEN_LIFETIME = 30
 
@@ -298,10 +300,12 @@ class Authenticator:
             # The platform may let the user try again (CTAP 2.1 section 6.5.5.7.3).
             raise CtapError(ERR_UV_INVALID, "user verification failed")
 
-    def _auth_data(self, rp_id_hash, flags, attested=b"", extensions=None):
+    def _auth_data(self, rp_id_hash, flags, attested=b"", extensions=None, counter=None):
         if extensions:
             flags |= FLAG_ED
-        data = rp_id_hash + bytes([flags]) + struct.pack(">I", self.store.next_counter())
+        if counter is None:
+            counter = self.store.next_counter()
+        data = rp_id_hash + bytes([flags]) + struct.pack(">I", counter)
         data += attested
         if extensions:
             data += cbor.encode(extensions)
@@ -692,10 +696,14 @@ class Authenticator:
         )
 
     def _assertion(self, cred, rp_id_hash, client_data_hash, flags, uv, hmac_input=None):
+        imported = cred.record and cred.record.get("source") == "bitwarden"
+        if imported:
+            flags |= FLAG_BE | FLAG_BS
         ext_out = None
         if hmac_input is not None and cred.hmac_seed:
             ext_out = {"hmac-secret": hmac_input.output(cred.hmac_seed, uv)}
-        auth_data = self._auth_data(rp_id_hash, flags, extensions=ext_out)
+        auth_data = self._auth_data(rp_id_hash, flags, extensions=ext_out,
+                                    counter=0 if imported else None)
         sig = keys.sign(cred.alg, cred.private_key, auth_data + client_data_hash)
         response = {
             1: {"type": "public-key", "id": cred.id},
@@ -875,6 +883,7 @@ def describe_record(rec):
         "created": rec["created"],
         "last_used": rec.get("last_used") or 0,
         "use_count": rec.get("use_count", 0),
+        "source": rec.get("source", "local"),
     }
 
 

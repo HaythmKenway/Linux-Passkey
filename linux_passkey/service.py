@@ -2,6 +2,7 @@
 
 import json
 import logging
+import os
 import threading
 
 import gi
@@ -9,8 +10,8 @@ import gi
 gi.require_version("Gio", "2.0")
 from gi.repository import Gio, GLib  # noqa: E402
 
-from . import DBUS_INTERFACE, DBUS_NAME, DBUS_PATH, __version__, webauthn  # noqa: E402
-from .ctap2 import Cancelled, Prompt, Request, Timeout, describe_record  # noqa: E402
+from . import DBUS_INTERFACE, DBUS_NAME, DBUS_PATH, __version__, bitwarden, webauthn  # noqa: E402
+from .ctap2 import Cancelled, Denied, Prompt, Request, Timeout, describe_record  # noqa: E402
 
 log = logging.getLogger(__name__)
 
@@ -37,6 +38,10 @@ INTERFACE_XML = """
     <method name="DeleteCredential">
       <arg type="s" name="id" direction="in"/>
       <arg type="b" name="deleted" direction="out"/>
+    </method>
+    <method name="ImportBitwarden">
+      <arg type="h" name="sealed_export" direction="in"/>
+      <arg type="u" name="imported" direction="out"/>
     </method>
     <method name="Retry"/>
     <method name="ResetAll">
@@ -125,6 +130,7 @@ class PasskeyService:
         self._watches = {}
         self._ceremonies = {}  # (sender, handle) -> cancel event
         self._ceremonies_lock = threading.Lock()
+        self._import_lock = threading.Lock()
         self._node = Gio.DBusNodeInfo.new_for_xml(INTERFACE_XML)
         self.broker.emit = self.emit
 
@@ -255,6 +261,83 @@ class PasskeyService:
         (cred_id,) = args
         deleted = self.daemon.require_store().delete(cred_id)
         invocation.return_value(GLib.Variant("(b)", (deleted,)))
+
+    def _m_ImportBitwarden(self, sender, args, invocation):
+        """Import a sealed snapshot only after specific consent and system UV.
+
+        No keys travel as D-Bus strings. One bounded import is active at a
+        time, and disconnecting its caller cancels the authorization request.
+        The keyring requirement never changes the backend of existing keys.
+        """
+        if (self.daemon.keys.backend_name != "keyring"
+                or not self.daemon.keys._keyring_backend().available()
+                or self.daemon.config.get("verification") != "polkit"
+                or not self.broker.verifier.available()):
+            raise PermissionError("Import requires the login keyring and system verification")
+        if not self._import_lock.acquire(blocking=False):
+            raise RuntimeError("An import is already running")
+        try:
+            descriptors = invocation.get_message().get_unix_fd_list()
+            if descriptors is None:
+                raise ValueError("A sealed import descriptor is required")
+            fd = descriptors.get(args[0])
+        except (GLib.Error, ValueError, IndexError):
+            self._import_lock.release()
+            raise ValueError("A sealed import descriptor is required") from None
+        request = Request()
+        watch = Gio.bus_watch_name_on_connection(
+            self.connection, sender, Gio.BusNameWatcherFlags.NONE, None,
+            lambda *unused: request.cancel.set(),
+        )
+
+        def work():
+            error = None
+            imported = 0
+            try:
+                batch = bitwarden.parse_export(bitwarden.read_import_fd(fd))
+                store = self.daemon.require_store()
+                if not batch.credentials:
+                    raise bitwarden.ImportError("No compatible passkeys in this export")
+                sites = sorted({cred.rp_id for cred in batch.credentials})
+                summary = "%d compatible passkeys; %d rejected. Sites: %s" % (
+                    len(batch.credentials), len(batch.errors), ", ".join(sites[:5]))
+                if len(sites) > 5:
+                    summary += " (+%d more)" % (len(sites) - 5)
+                summary += ". Storage upgrades to v2; older Linux Passkey versions cannot read it"
+                accounts = [summary]
+                self.broker.confirm(Prompt("import", "Bitwarden", accounts=accounts, verify=True), request)
+                if not self.broker.verify(Prompt("import", verify=True), request):
+                    raise Denied()
+                if request.cancel.is_set():
+                    raise Cancelled()
+                # Reset must not replace the store while an authorized batch
+                # is committing. The snapshot belongs to this store only.
+                with self.daemon._lock:
+                    if self.daemon.store is not store or request.cancel.is_set():
+                        raise Cancelled()
+                    imported = store.import_credentials(batch.credentials)
+            except (Denied, Cancelled, Timeout):
+                error = ("org.freedesktop.DBus.Error.AccessDenied", "Import was not authorized")
+            except (bitwarden.ImportError, ValueError) as e:
+                error = ("org.freedesktop.DBus.Error.InvalidArgs", str(e))
+            except Exception:
+                # Never log exceptions carrying vault contents or crypto data.
+                error = ("org.freedesktop.DBus.Error.Failed", "Import failed; no batch changes saved")
+            finally:
+                os.close(fd)
+
+            def done():
+                Gio.bus_unwatch_name(watch)
+                self._import_lock.release()
+                if error:
+                    invocation.return_dbus_error(*error)
+                else:
+                    invocation.return_value(GLib.Variant("(u)", (imported,)))
+                return False
+
+            GLib.idle_add(done)
+
+        threading.Thread(target=work, name="bitwarden-import", daemon=True).start()
 
     def _m_ResetAll(self, sender, args, invocation):
         # Verification blocks, so it runs off the main loop.

@@ -2,6 +2,7 @@ linux_passkey/prompts.py
 linux_passkey/app/main.py
 linux_passkey/app/prompt.py
 linux_passkey/app/window.py
+linux_passkey/app/integrations.py
 gnome-extension/passkey@haythmkenway.github.io/dialog.js
 gnome-extension/passkey@haythmkenway.github.io/extension.js
 gnome-extension/passkey@haythmkenway.github.io/prompts.js

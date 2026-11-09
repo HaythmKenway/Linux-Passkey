@@ -45,6 +45,9 @@ class PasskeyWindow(Adw.ApplicationWindow):
 
         menu = Gio.Menu()
         section = Gio.Menu()
+        section.append(_("Settings"), "win.settings")
+        menu.append_section(None, section)
+        section = Gio.Menu()
         section.append(_("Delete All Passkeys…"), "win.reset")
         menu.append_section(None, section)
         section = Gio.Menu()
@@ -99,6 +102,7 @@ class PasskeyWindow(Adw.ApplicationWindow):
         self.set_content(view)
 
         self._add_win_action("reset", self.on_reset)
+        self._add_win_action("settings", self.on_settings)
 
         try:
             self.client = DaemonClient(on_change=self.schedule_refresh)
@@ -287,6 +291,7 @@ class PasskeyWindow(Adw.ApplicationWindow):
             (_("Last used"), _ago(cred["last_used"])),
             (_("Times used"), str(cred["use_count"])),
             (_("Algorithm"), cred["algorithm"]),
+            (_("Source"), _("Bitwarden (local copy)") if cred.get("source") == "bitwarden" else _("Local")),
         ):
             detail = Adw.ActionRow(title=title, subtitle=GLib.markup_escape_text(value or "—"))
             detail.add_css_class("property")
@@ -301,10 +306,20 @@ class PasskeyWindow(Adw.ApplicationWindow):
         )
         delete.connect("clicked", self.on_delete, cred)
         row.add_suffix(delete)
+        if cred.get("source") == "bitwarden":
+            badge = Gtk.Image.new_from_icon_name("document-import-symbolic")
+            badge.set_tooltip_text(_("Imported from Bitwarden"))
+            row.add_prefix(badge)
         self.passkeys_group.add(row)
         self._passkey_rows.append(row)
 
     # -- actions ----------------------------------------------------------
+
+    def on_settings(self, *args):
+        """Open the integration settings using the existing preferences style."""
+        from .integrations import IntegrationsDialog
+
+        IntegrationsDialog(self).present(self)
 
     def on_banner_clicked(self, banner):
         if self._banner_action is not None:

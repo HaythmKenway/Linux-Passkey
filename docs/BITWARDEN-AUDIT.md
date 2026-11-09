@@ -3,7 +3,10 @@
 Data: 9 de novembro de 2026. Base inspecionada: commit
 `190774c83839ffc820c6425430f52f4b377e8c47`.
 
-**Estado: investigação e proposta técnica; integração ainda não implementada.**
+**Estado deste relatório: investigação e proposta técnica anteriores à implementação.**
+O primeiro incremento posterior é a importação manual descrita em
+[BITWARDEN-IMPORT.md](BITWARDEN-IMPORT.md). As afirmações de ausência de
+implementação abaixo registram o estado observado durante a auditoria.
 Este documento não é uma declaração de compatibilidade. Não houve login no
 Bitwarden, acesso a cofre real, importação ou alteração de passkeys do usuário.
 As evidências das interfaces externas estão em

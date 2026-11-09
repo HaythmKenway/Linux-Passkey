@@ -1,5 +1,7 @@
 """Thin D-Bus client for the passkey daemon."""
 
+import os
+
 from gi.repository import Gio, GLib
 
 from .. import DBUS_INTERFACE, DBUS_NAME, DBUS_PATH
@@ -62,3 +64,26 @@ class DaemonClient:
 
     def delete(self, cred_id):
         return self._call("DeleteCredential", GLib.Variant("(s)", (cred_id,)))[0]
+
+    def import_bitwarden(self, data, callback):
+        """Send an immutable in-memory export; only public counts return."""
+        from ..bitwarden import create_import_fd
+
+        fd = create_import_fd(data)
+        try:
+            descriptors = Gio.UnixFDList.new()
+            index = descriptors.append(fd)
+
+            def done(proxy, result):
+                try:
+                    value, unused_fds = proxy.call_with_unix_fd_list_finish(result)
+                    callback(value.unpack(), None)
+                except GLib.Error as e:
+                    callback(None, e)
+
+            self.proxy.call_with_unix_fd_list(
+                "ImportBitwarden", GLib.Variant("(h)", (index,)),
+                Gio.DBusCallFlags.NONE, GLib.MAXINT, descriptors, None, done,
+            )
+        finally:
+            os.close(fd)
