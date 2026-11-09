@@ -82,6 +82,9 @@ def host_folders(home=None):
     for name, profiles in FIREFOX_BROWSERS.items():
         if any(os.path.isfile(os.path.join(home, p, "profiles.ini")) for p in profiles):
             yield os.path.join(home, name, "native-messaging-hosts"), "firefox"
+    # Recent Firefox installations use the XDG configuration directory.
+    if os.path.isfile(os.path.join(config, "mozilla", "firefox", "profiles.ini")):
+        yield os.path.join(config, "mozilla", "native-messaging-hosts"), "firefox"
 
 
 def register(host_path, home=None):
