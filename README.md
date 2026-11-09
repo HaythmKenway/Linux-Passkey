@@ -219,6 +219,11 @@ passkeyd --verbose          # run in the foreground (stop the service first)
 
 ## Development
 
+The proposed Bitwarden integration is under investigation, not implemented.
+See the [architecture and compatibility audit](docs/BITWARDEN-AUDIT.md) and
+[official interface findings](docs/BITWARDEN-INTERFACES.md) for feasibility,
+security blockers, and the proposed implementation and test plan.
+
 ```sh
 make check        # unit, CTAPHID, D-Bus, fuzz and end-to-end WebAuthn tests (python-fido2 client + server)
 make lint         # pyflakes, ESLint, desktop-file, AppStream and polkit validation
