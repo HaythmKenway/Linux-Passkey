@@ -1,32 +1,33 @@
-# Importação de passkeys Bitwarden
+# Importing Bitwarden passkeys
 
-## Estado da integração
+## Integration status
 
-Este primeiro incremento implementa **importação gráfica de cópias locais** a
-partir de um JSON oficial. Não implementa login, conta conectada, histórico
-persistente de sincronização ou agendamento. O Bitwarden não é acessado pelo
-Linux Passkey nesta versão; não há senha mestra, token ou sessão Bitwarden para
-armazenar. Não é necessário instalar `bw`.
+This first increment implements **graphical import of local copies** from an
+official JSON export. It does not implement login, a connected account,
+persistent synchronization history, or scheduling. Linux Passkey does not
+access Bitwarden in this version, so there is no Bitwarden master password,
+token, or session to store. Installing `bw` is not required.
 
-Os bloqueios para sincronização conectada continuam registrados na
-[pesquisa das interfaces oficiais](BITWARDEN-INTERFACES.md): o CLI pode gravar
-tokens sem cifra em JSON, e seu estado não comprova o bloqueio do desktop.
-Isso não foi contornado com endpoints privados nem apresentado como resolvido.
+The blockers for connected synchronization remain documented in the
+[official interface research](BITWARDEN-INTERFACES.md): the CLI can write
+unencrypted tokens to JSON, and its state does not establish whether the
+desktop app is locked. These issues have not been bypassed with private
+endpoints or presented as resolved.
 
-## Instalação no CachyOS/Arch com Niri
+## Installation on CachyOS/Arch with Niri
 
-Dependências já usadas pelo projeto:
+Dependencies already used by the project:
 
 ```sh
 sudo pacman -S --needed python python-gobject python-cryptography gtk4 libadwaita libsecret publicsuffix-list polkit make gettext
 ```
 
-É necessário um provedor Secret Service, como GNOME Keyring, desbloqueado na
-sessão, e um agente polkit funcional no Niri. A extensão GNOME não é necessária.
-Se as credenciais existentes usam backend de arquivo, a importação ficará
-indisponível: esta versão não migra a chave mestra nem troca seu backend.
+A Secret Service provider, such as GNOME Keyring, must be unlocked in the
+session, and Niri must have a working polkit agent. The GNOME extension is not
+required. If existing credentials use the file backend, import will be
+unavailable: this version does not migrate the master key or switch its backend.
 
-Instale o aplicativo e o daemon **da mesma revisão** e recarregue a unidade:
+Install the application and daemon **from the same revision**, then reload the unit:
 
 ```sh
 sudo make install-app install-locale
@@ -35,152 +36,154 @@ systemctl --user restart linux-passkey.service
 linux-passkey
 ```
 
-Uma interface nova conectada a um daemon antigo não poderá chamar
-`ImportBitwarden`. Feche e reabra o aplicativo depois da instalação. Instalar
-ou atualizar o programa não importa credenciais automaticamente.
+A new UI connected to an old daemon cannot call `ImportBitwarden`. Close and
+reopen the application after installation. Installing or updating the program
+does not import credentials automatically.
 
-## Como importar
+## How to import
 
-1. No aplicativo oficial Bitwarden, exporte os dados individuais em formato
-   **JSON não criptografado**. CSV não transporta as chaves das passkeys.
-2. Abra o Linux Passkey e escolha **Settings → Integrations → Bitwarden**.
-3. Use **Choose JSON…** e selecione o arquivo local. A leitura e validação
-   acontecem fora da thread gráfica; limite de 16 MiB e 1000 passkeys.
-4. Confira os sites/contas na prévia e os motivos das entradas recusadas.
-   A prévia mostra até 20 entradas por categoria, informando o total do lote.
-5. Confirme **Import Compatible Passkeys**, aprove o prompt de importação e
-   confirme sua identidade pelo agente polkit. Recusar ou cancelar não importa
-   o lote. Biometria depende de sua configuração PAM/fprintd.
-6. As cópias aparecem na lista com um ícone de importação e origem
-   **Bitwarden (local copy)** nos detalhes. O resultado da operação aparece
-   na página de integrações enquanto essa janela permanecer aberta.
+1. In the official Bitwarden application, export your individual vault data as
+   **unencrypted JSON**. CSV does not carry passkey private keys.
+2. Open Linux Passkey and choose **Settings → Integrations → Bitwarden**.
+3. Select **Choose JSON…** and choose the local file. Reading and validation
+   run outside the UI thread, with limits of 16 MiB and 1000 passkeys.
+4. Review the sites/accounts in the preview and the reasons for rejected
+   entries. The preview displays up to 20 entries per category and reports
+   the total batch size.
+5. Confirm **Import Compatible Passkeys**, approve the import prompt, and
+   verify your identity through the polkit agent. Denying or cancelling does
+   not import the batch. Biometrics depend on your PAM/fprintd configuration.
+6. Copies appear in the list with an import icon and **Bitwarden (local copy)**
+   as their source in the details. The operation result remains on the
+   integrations page while that window is open.
 
-O JSON exportado contém chaves privadas e pode conter senhas e outros dados do
-cofre. O programa não faz outra cópia desse arquivo no disco. Remova o arquivo
-de exportação após o uso conforme sua política de armazenamento; não o envie
-para issues, logs, testes ou este repositório. A aplicação não promete apagar
-retroativamente cópias, backups ou blocos já escritos pelo exportador.
+The exported JSON contains private keys and may contain passwords and other
+vault data. The program does not create another copy of that file on disk.
+Remove the export after use according to your storage policy; do not submit
+it to issues, logs, tests, or this repository. The application does not promise
+to retroactively erase copies, backups, or blocks already written by the exporter.
 
-## Compatibilidade e validação
+## Compatibility and validation
 
-- Chave privada PKCS#8 DER em base64url, ES256/ECDSA P-256.
-- Credential ID UUID ou `b64.` conforme a representação do Bitwarden, preservado
-  como os bytes originais, com limite de 1023 bytes. Nunca é gerado outro ID.
-- RP ID válido e não público, user handle de 1–64 bytes, data com timezone,
-  metadados de tamanho limitado e credencial descobrível.
-- Somente contador de assinatura `"0"`. Credenciais antigas com contador
-  positivo são recusadas para evitar divergência entre autenticadores.
-- A origem Bitwarden comprovada na pesquisa usa BE=BS=true; as cópias mantêm
-  essa semântica. Flags explicitamente contraditórias são recusadas. Isso não
-  é um importador genérico de arquivos de outros fabricantes.
-- EdDSA/Ed25519, JSON criptografado, CXF/CXP, ZIP e contadores positivos não são
-  suportados por este importador. As passkeys locais EdDSA continuam funcionando.
-- O seed PRF/hmac-secret original não é exportado por esse formato; não se
-  afirma continuidade de PRF em cópias importadas.
+- Base64url-encoded PKCS#8 DER private key, ES256/ECDSA P-256.
+- UUID or `b64.` credential ID in Bitwarden's representation, preserved as the
+  original bytes, up to 1023 bytes. A replacement ID is never generated.
+- Valid RP ID that is not a public suffix, a 1–64 byte user handle, a timestamp
+  with a timezone, bounded metadata, and a discoverable credential.
+- Only signature counter `"0"` is supported. Older credentials with a positive
+  counter are rejected to avoid divergence between authenticators.
+- The Bitwarden producer verified in the research uses BE=BS=true; copies
+  preserve that meaning. Explicitly contradictory flags are rejected. This is
+  not a generic importer for files from other vendors.
+- EdDSA/Ed25519, encrypted JSON, CXF/CXP, ZIP, and positive counters are not
+  supported by this importer. Local EdDSA passkeys continue to work.
+- The original PRF/hmac-secret seed is not exported in this format; PRF
+  continuity is not claimed for imported copies.
 
-A importação força credProtect=3: o uso da cópia exige verificação local.
-Solicitações CTAP sem UV podem não encontrar essas credenciais; o cliente
-precisa solicitar UV. Origem e RP continuam sendo validados a cada operação
-WebAuthn. Senha/biometria Linux não desbloqueia o Bitwarden.
+Import enforces credProtect=3: using the copy requires local verification.
+CTAP requests without UV may not find these credentials; the client must
+request UV. Origin and RP checks still apply to every WebAuthn operation.
+Linux password/biometric verification does not unlock Bitwarden.
 
-## Duplicatas, conflitos e exclusões
+## Duplicates, conflicts, and deletion
 
-Reimportar a mesma identidade, RP, handle e chave não cria outra cópia nem
-sobrescreve metadados/estatísticas locais. Um ID existente com chave, RP,
-handle ou origem diferente aborta o lote inteiro; a mensagem não contém chaves.
-Conflitos não têm resolução destrutiva automática.
+Reimporting the same identity, RP, handle, and key does not create another copy
+or overwrite local metadata/statistics. An existing ID with a different key,
+RP, handle, or source aborts the entire batch; the message contains no keys.
+Conflicts are never resolved by automatic destructive changes.
 
-Entradas de formato incompatível são recusadas individualmente e aparecem na
-prévia. O subconjunto válido só é gravado após confirmação, em uma transação.
-Falhas antes da troca atômica do arquivo preservam o estado anterior na memória
-e no disco. Uma falha depois do commit pode ser resolvida reimportando o mesmo
-lote, pois a operação é idempotente.
+Entries with incompatible formats are rejected individually and shown in the
+preview. The valid subset is written only after confirmation, in one transaction.
+Failures before the atomic file replacement preserve the previous state in
+memory and on disk. A failure after commit can be handled by reimporting the
+same batch, since the operation is idempotent.
 
-As passkeys preexistentes são mantidas, inclusive quando pertencem ao mesmo RP
-e usuário. Use o botão de exclusão da lista para remover uma cópia importada.
-Isso não exclui a original no Bitwarden nem revoga o cadastro no site.
-Uma importação manual futura pode recriar uma cópia excluída; não há ainda
-reconciliação remota, tombstones ou detecção de remoções.
+Existing passkeys are preserved, including those for the same RP and user.
+Use the list's delete button to remove an imported copy. This does not delete
+the original in Bitwarden or revoke its registration with the website.
+A later manual import can recreate a deleted copy; remote reconciliation,
+tombstones, and removal detection are not implemented yet.
 
-Não há conexão para desconectar nesta versão. Bloquear o Bitwarden, remover um
-item remoto ou revogar uma sessão **não revoga as cópias já importadas**. Essas
-passkeys são sincronizáveis copiadas para armazenamento local cifrado, não
-chaves privadas vinculadas ao hardware do notebook.
+There is no connection to disconnect in this version. Locking Bitwarden,
+removing a remote item, or revoking a session **does not revoke copies already
+imported**. These are syncable passkeys copied into encrypted local storage,
+not private keys bound to the laptop's hardware.
 
-## Armazenamento, autorização e migração
+## Storage, authorization, and migration
 
-O mesmo arquivo `~/.local/share/linux-passkey/credentials.enc` guarda registros
-externos e as chaves privadas normalizadas, dentro do envelope AES-256-GCM
-existente e sob a mesma chave mestra no keyring. Não há outro banco de chaves.
-Metadados públicos têm projeção explícita; chaves não aparecem em
-`ListCredentials`, status, detalhes da interface ou respostas de importação.
+The same `~/.local/share/linux-passkey/credentials.enc` file stores external
+records and normalized private keys, inside the existing AES-256-GCM envelope
+and under the same master key in the keyring. There is no separate key database.
+Public metadata uses an explicit projection; keys do not appear in
+`ListCredentials`, status, UI details, or import responses.
 
-O IPC usa um memfd selado e imutável enviado como descritor Unix. Chaves e
-conteúdo do cofre não são argumentos de shell nem strings em chamadas D-Bus.
-O daemon lê um lote limitado, exige consentimento próprio e polkit, rejeita
-jobs concorrentes e observa a desconexão do remetente. O booleano de autorização
-nunca vem do cliente. Erros criptográficos são sanitizados; não se registram
-exports, chaves ou sessões em logs.
+IPC uses a sealed, immutable memfd sent as a Unix file descriptor. Keys and
+vault contents are not shell arguments or strings in D-Bus calls. The daemon
+reads a bounded batch, requires its own consent prompt and polkit verification,
+rejects concurrent jobs, and watches for the sender disconnecting. An
+authorization boolean never comes from the client. Cryptographic errors are
+sanitized; exports, keys, and sessions are not logged.
 
-Antes da primeira importação, o leitor aceita o formato v1 existente. No
-primeiro commit de dados externos, grava formato **v2**, mantendo os IDs locais
-inalterados e salvando o ciphertext v1 anterior em `credentials.enc.pre-import`
-(0600), quando existia um arquivo anterior. Não há snapshot se o cofre estava
-vazio e ainda não tinha arquivo. Não é uma rotação da chave mestra.
+Before the first import, the reader accepts the existing v1 format. The first
+commit of external data writes format **v2**, keeping local IDs unchanged and
+saving the previous v1 ciphertext as `credentials.enc.pre-import` (0600), if a
+file already existed. No snapshot is created if the vault was empty and had
+no file yet. This does not rotate the master key.
 
-O programa original não lê v2 e falha fechado. Não execute as duas versões
-como escritores do mesmo cofre. Para downgrade, pare o daemon e preserve uma
-cópia do arquivo v2 atual antes de qualquer restauração. Restaurar o snapshot
-exclui as mudanças posteriores da visão restaurada e só funciona se a chave
-mestra não foi girada; exige decisão explícita. O programa não faz downgrade
-nem restauração automática. Os registros locais anteriores continuam
-utilizáveis no programa novo, sem migração de seus IDs.
+The original program cannot read v2 and fails closed. Do not run both versions
+as writers to the same vault. To downgrade, stop the daemon and preserve a copy
+of the current v2 file before any restoration. Restoring the snapshot removes
+later changes from the restored view and works only if the master key has not
+been rotated; this requires an explicit decision. The program does not downgrade
+or restore automatically. Previous local records remain usable in the new
+program without migrating their IDs.
 
-O lock do store é por processo e o nome D-Bus limita o daemon a uma instância
-por barramento. Não são suportados escritores em barramentos distintos usando
-o mesmo diretório. A escrita usa o helper atômico existente, sem prometer uma
-garantia nova contra perda de energia além da persistência desse helper.
+The store lock is per process, and the D-Bus name limits the daemon to one
+instance per bus. Writers on separate buses sharing the same directory are
+not supported. Writing uses the existing atomic helper, without claiming a
+new power-loss guarantee beyond that helper's persistence behavior.
 
-Secret Service e polkit não isolam totalmente processos hostis do mesmo UID,
-root ou um desktop comprometido. Chaves precisam existir na memória durante
-uso; Python não oferece garantia de zeroização de todas as cópias. O keyring
-ser bloqueado após a abertura não elimina as chaves já carregadas pelo daemon.
+Secret Service and polkit do not fully isolate hostile processes running under
+the same UID, root, or a compromised desktop. Keys must exist in memory during
+use; Python does not guarantee zeroization of every copy. Locking the keyring
+after opening the store does not remove keys already loaded by the daemon.
 
-## Validação e revisão de segurança
+## Validation and security review
 
-Os testes usam apenas credenciais geradas para teste. O servidor `Fido2Server`
-recebe a chave pública conhecida **antes** da importação e verifica asserções
-pelos caminhos plataforma e CTAPHID: ID original, assinatura, RP, user handle,
-UP/UV, BE/BS e contador zero. Isso comprova uso da chave importada, não uma
-nova credencial substituta. Ainda não foi feito um teste contra conta Bitwarden
-descartável ou um site real; não se declara interoperabilidade universal.
+Tests use only credentials generated for testing. The `Fido2Server` receives
+the known public key **before** import and verifies assertions through both the
+platform and CTAPHID paths: original ID, signature, RP, user handle, UP/UV,
+BE/BS, and a zero counter. This demonstrates use of the imported key rather
+than a newly generated replacement credential. No test against a disposable
+Bitwarden account or a real website has been performed yet; universal
+interoperability is not claimed.
 
-Também são testados parsing e rejeições, importação parcial, duplicatas,
-conflitos, coexistência com passkeys locais, reabertura do store, snapshot v1,
-rollback por falha de disco, descritores imutáveis, projeção pública, ausência
-de chave em logs, confirmação negada, verificação negada/desabilitada,
-cancelamento, concorrência e o cliente assíncrono da interface.
+Tests also cover parsing and rejection, partial imports, duplicates, conflicts,
+coexistence with local passkeys, store reopening, the v1 snapshot, rollback on
+disk failure, immutable descriptors, public projections, absence of keys in
+logs, denied confirmation, denied/disabled verification, cancellation,
+concurrency, and the UI's asynchronous client.
 
-Revisão de segurança deste incremento:
+Security review for this increment:
 
-| Área | Resultado |
+| Area | Result |
 |---|---|
-| Autorização | Verificação no daemon, aprovação explícita, keyring e polkit obrigatórios, cancelamento antes do commit |
-| Criptografia | Reutiliza AES-GCM/HKDF e parsing do `cryptography`; nenhum algoritmo ou backend novo |
-| Exposição | Não usa CLI, senha mestra ou tokens; FD selado, projeção pública explícita, exceções sanitizadas |
-| Integridade | Lote validado, conflito aborta a transação, snapshot cifrado, memória trocada após persistência |
-| Injeção | Sem shell, endpoints ou execução de dados importados; JSON limitado e chaves duplicadas recusadas |
-| UI | Leitura em worker, labels escapados na lista, prévia sem markup e sem material privado |
-| Rede/SSRF | Não há acesso remoto neste incremento; sandbox do daemon mantido |
-| Dependências | Nenhuma dependência de runtime adicionada; não se afirma auditoria completa de CVEs das dependências existentes |
+| Authorization | Daemon-side checks, explicit approval, mandatory keyring and polkit, cancellation before commit |
+| Cryptography | Reuses AES-GCM/HKDF and `cryptography` parsing; no new algorithm or backend |
+| Exposure | No CLI, master password, or tokens; sealed FD, explicit public projection, sanitized exceptions |
+| Integrity | Validated batch, conflicts abort the transaction, encrypted snapshot, memory replaced after persistence |
+| Injection | No shell, endpoints, or execution of imported data; bounded JSON and duplicate fields rejected |
+| UI | Worker-thread reading, escaped labels in the list, preview without markup or private material |
+| Network/SSRF | No remote access in this increment; daemon sandbox retained |
+| Dependencies | No runtime dependency added; no claim of a complete CVE audit of existing dependencies |
 
-Execute `make check` e `make lint` no ambiente de desenvolvimento. O teste de
-inicialização GTK no Niri abre apenas a página, sem autorizar importação nem
-usar credenciais do usuário. O teste automatizado de polkit usa um verificador
-de teste; não comprova funcionamento de um leitor biométrico físico.
+Run `make check` and `make lint` in the development environment. The GTK startup
+test on Niri opens only the page, without authorizing import or using the user's
+credentials. The automated polkit test uses a test verifier; it does not prove
+that a physical biometric reader works.
 
-Resultado desta revisão: `make check` passou com **168 testes** (43 avisos de
-depreciação GLib/PyGObject); `make lint` passou, com o aviso já existente sobre
-a referência externa do DTD polkit, validada pelo DTD local. A página GTK foi
-inicializada na sessão Niri sem importar dados. Nenhuma dependência de runtime
-foi adicionada.
+Results of this review: `make check` passed with **168 tests** (43 GLib/PyGObject
+deprecation warnings); `make lint` passed, with the existing warning about the
+external polkit DTD reference, validated using the local DTD. The GTK page was
+initialized in the Niri session without importing data. No runtime dependency
+was added.

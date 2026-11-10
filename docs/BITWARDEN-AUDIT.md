@@ -1,361 +1,364 @@
-# Bitwarden: auditoria de arquitetura e plano de compatibilidade
+# Bitwarden: architecture audit and compatibility plan
 
-Data: 9 de novembro de 2026. Base inspecionada: commit
+Date: November 9, 2026. Inspected baseline: commit
 `190774c83839ffc820c6425430f52f4b377e8c47`.
 
-**Estado deste relatório: investigação e proposta técnica anteriores à implementação.**
-O primeiro incremento posterior é a importação manual descrita em
-[BITWARDEN-IMPORT.md](BITWARDEN-IMPORT.md). As afirmações de ausência de
-implementação abaixo registram o estado observado durante a auditoria.
-Este documento não é uma declaração de compatibilidade. Não houve login no
-Bitwarden, acesso a cofre real, importação ou alteração de passkeys do usuário.
-As evidências das interfaces externas estão em
+**Report status: research and technical proposal preceding implementation.**
+The first subsequent increment is the manual import described in
+[BITWARDEN-IMPORT.md](BITWARDEN-IMPORT.md). Statements below about missing
+implementation record the state observed during the audit.
+This document is not a compatibility claim. No Bitwarden login, real vault
+access, import, or modification of the user's passkeys occurred during the audit.
+Evidence about external interfaces is in
 [BITWARDEN-INTERFACES.md](BITWARDEN-INTERFACES.md).
 
-## Veredito de viabilidade
+## Feasibility verdict
 
-| Capacidade | Resultado da investigação |
+| Capability | Research result |
 |---|---|
-| Recuperar chave privada original | Confirmado estaticamente: JSON e cadeia `bw list items` incluem `keyValue` PKCS#8; falta teste com versão publicada e cofre descartável |
-| Importar sem trocar o ID | Possível após adaptar o store; impossível pelo `lookup()` atual |
-| Usar senha/biometria Linux nas asserções | O mecanismo local já existe; a credencial importada ainda precisa da prova WebAuthn independente |
-| OAuth público de terceiros para passkeys | Não localizado nas interfaces oficiais examinadas; não projetar um fluxo fictício |
-| CXP nativo Linux | Não confirmado; o fluxo documentado é móvel |
-| Sincronizar pelo CLI comum sem tokens em JSON claro | Não atende: o CLI pode persistir access/refresh tokens em `data.json` sem cifra |
-| Respeitar o bloqueio do desktop usando `bw status` | Não comprovado: CLI e desktop têm estados distintos; status pode tentar auto-unlock |
-| EdDSA exportada pelo Bitwarden | Não comprovada no produtor examinado; Ed25519 já existe no autenticador local, mas isso não prova suporte de exportação |
+| Retrieve the original private key | Statically confirmed: JSON and the `bw list items` chain include PKCS#8 `keyValue`; a published version and disposable vault still need testing |
+| Import without replacing the ID | Possible after adapting the store; impossible through the current `lookup()` |
+| Use Linux password/biometrics for assertions | The local mechanism already exists; imported credentials still need independent WebAuthn proof |
+| Public third-party OAuth for passkeys | Not found in the official interfaces examined; do not design a fictional flow |
+| Native Linux CXP | Unconfirmed; the documented flow is mobile |
+| Synchronize through the standard CLI without plaintext JSON tokens | Does not comply: the CLI can persist unencrypted access/refresh tokens in `data.json` |
+| Respect desktop locking using `bw status` | Unproven: CLI and desktop states differ; status may attempt auto-unlock |
+| EdDSA exported by Bitwarden | Unproven in the examined producer; the local authenticator already supports Ed25519, but that does not establish export support |
 
-**Decisão desta etapa:** não implementar conexão/sincronização com o CLI padrão
-como se cumprisse o requisito de armazenamento de tokens. O caminho independente
-viável é importação gráfica explícita de JSON oficial, com validação e
-confirmação. Ele não exige gerenciar login Bitwarden, mas também não entrega
-sincronização automática nem acompanha o bloqueio remoto. Essa alternativa deve
-ser identificada na interface como importação de cópia, nunca como conta
-conectada. Nenhuma das duas funcionalidades foi implementada nesta auditoria.
+**Decision for this stage:** do not implement connection/synchronization through
+the standard CLI as though it met the token storage requirement. The viable
+independent path is explicit graphical import of official JSON, with validation
+and confirmation. It does not require managing Bitwarden login, but also does
+not provide automatic synchronization or track remote locking. The UI must
+identify this alternative as importing a copy, never as a connected account.
+Neither feature was implemented during this audit.
 
-Uma solução futura para o estado da CLI precisa provar ausência de segredos
-persistidos em claro, reutilização autorizada e semântica de bloqueio antes de
-ativar agendamento. Mover `data.json` para `/tmp` ou tmpfs não cifra seu conteúdo
-e não é, por si só, cumprimento da regra. Reutilizar arquivos/sessões privadas
-do aplicativo desktop também não é uma interface oficial de autorização.
+A future solution for CLI state must prove that secrets are not persisted in
+plaintext, that reuse is authorized, and that locking semantics are correct
+before enabling scheduling. Moving `data.json` to `/tmp` or tmpfs does not
+encrypt its contents and does not, by itself, satisfy the requirement. Reusing
+the desktop application's private files/sessions is not an official
+authorization interface either.
 
-## 1. Estrutura e fluxo existente
+## 1. Existing structure and flow
 
-| Área | Responsabilidade e pontos de entrada |
+| Area | Responsibility and entry points |
 |---|---|
-| `linux_passkey/daemon.py` | Processo de sessão, ciclo GLib, abertura assíncrona do cofre, recuperação, dispositivo e serviço D-Bus |
-| `ctap2.py`, `pinuv.py`, `cbor.py` | Autenticador CTAP 2.1, comandos, UV, tokens por permissões/RP, seleção de contas, gerenciamento de credenciais |
-| `ctaphid.py`, `uhid.py` | Framing, canais, keepalive/cancelamento e dispositivo virtual FIDO via `/dev/uhid` |
-| `webauthn.py` | Cliente WebAuthn para a extensão: valida origem/RP ID, consulta PSL, constrói `clientDataJSON` |
-| `store.py`, `keys.py`, `masterkey.py`, `paths.py` | IDs autocontidos, metadados cifrados, primitivas criptográficas, chave mestra e escrita atômica |
-| `service.py`, `broker.py`, `verify.py` | D-Bus, prompts de aprovação e comprovação de identidade via polkit |
-| `nativehost.py`, `browsers.py`, `browser-extension/` | Transporte browser → native messaging → D-Bus e registro dos hosts |
-| `app/` | Gerenciador GTK4/libadwaita, cliente D-Bus e janela de aprovação independente |
-| `gnome-extension/` | Agente de aprovação GNOME opcional, não necessário no Niri |
-| `data/`, `bin/`, `Makefile` | Launchers, systemd user, ativação D-Bus, udev, polkit, ícones, manuais e instalação |
-| `debian/`, `packaging/`, `snap/` | Empacotamento por distribuição e restrições específicas do Snap |
-| `tests/`, `.github/workflows/ci.yml`, `tools/` | pytest, integração FIDO/D-Bus, fuzzing, lint e empacotamento/publicação |
-| `po/`, `docs/`, `README.md` | gettext, documentação do produto, auditoria de conformidade e plano de testes manuais |
+| `linux_passkey/daemon.py` | Session process, GLib loop, asynchronous vault opening, recovery, device, and D-Bus service |
+| `ctap2.py`, `pinuv.py`, `cbor.py` | CTAP 2.1 authenticator, commands, UV, permission/RP-scoped tokens, account selection, credential management |
+| `ctaphid.py`, `uhid.py` | Framing, channels, keepalive/cancellation, and virtual FIDO device through `/dev/uhid` |
+| `webauthn.py` | WebAuthn client for the extension: validates origin/RP ID, queries PSL, constructs `clientDataJSON` |
+| `store.py`, `keys.py`, `masterkey.py`, `paths.py` | Self-contained IDs, encrypted metadata, cryptographic primitives, master key, atomic writes |
+| `service.py`, `broker.py`, `verify.py` | D-Bus, approval prompts, and identity verification through polkit |
+| `nativehost.py`, `browsers.py`, `browser-extension/` | Browser → native messaging → D-Bus transport and host registration |
+| `app/` | GTK4/libadwaita manager, D-Bus client, and stand-alone approval window |
+| `gnome-extension/` | Optional GNOME approval agent, not required on Niri |
+| `data/`, `bin/`, `Makefile` | Launchers, systemd user unit, D-Bus activation, udev, polkit, icons, manuals, and installation |
+| `debian/`, `packaging/`, `snap/` | Distribution packaging and Snap-specific restrictions |
+| `tests/`, `.github/workflows/ci.yml`, `tools/` | pytest, FIDO/D-Bus integration, fuzzing, lint, packaging/publication |
+| `po/`, `docs/`, `README.md` | gettext, product documentation, compliance audit, and manual test plan |
 
 ```mermaid
 flowchart LR
-    B[Browser e extensão] --> N[Native host]
-    N --> D[D-Bus de sessão]
-    USB[Browser e CTAPHID] --> H[uhid e ctaphid]
+    B[Browser and extension] --> N[Native host]
+    N --> D[Session D-Bus]
+    USB[Browser and CTAPHID] --> H[uhid and ctaphid]
     H --> A[Authenticator]
     D --> A
-    UI[GTK ou agente GNOME] <--> D
+    UI[GTK or GNOME agent] <--> D
     A --> S[CredentialStore]
     S --> E[credentials.enc]
-    K[Secret Service ou arquivo protegido] --> S
-    A --> P[ApprovalBroker e polkit]
+    K[Secret Service or protected file] --> S
+    A --> P[ApprovalBroker and polkit]
 ```
 
-`Daemon.run()` possui o nome de sessão
-`io.github.haythmkenway.Passkey.Daemon`. `Authenticator.execute()` serializa
-comandos USB e plataforma com um lock. `PasskeyService._ceremony()` trabalha
-fora do loop GTK/GLib; os cancelamentos são vinculados ao remetente D-Bus e ao
-identificador da operação. O transporte HID também mantém keepalives durante
-aprovação. Uma falha no Bitwarden deve ficar fora desse caminho de autenticação.
+`Daemon.run()` owns the session name
+`io.github.haythmkenway.Passkey.Daemon`. `Authenticator.execute()` serializes
+USB and platform commands with a lock. `PasskeyService._ceremony()` runs
+outside the GTK/GLib loop; cancellations are bound to the D-Bus sender and
+operation handle. The HID transport also maintains keepalives during approval.
+Bitwarden failures must remain outside this authentication path.
 
-## 2. Credenciais, criptografia e invariantes existentes
+## 2. Existing credentials, cryptography, and invariants
 
-### Criação e recuperação
+### Creation and recovery
 
-[store.py](../linux_passkey/store.py), `create()` e `lookup()`:
+[store.py](../linux_passkey/store.py), `create()` and `lookup()`:
 
-- O ID v1 contém uma chave privada cifrada: versão, nonce AES-GCM e payload CBOR.
-  A informação autenticada inclui o hash SHA-256 do RP ID.
-- HKDF-SHA256 deriva chaves distintas para wrapping e arquivo. Os rótulos
-  históricos `ubuntu-passkey credential wrap` e `ubuntu-passkey store` são
-  invariantes de compatibilidade; não podem ser renomeados.
-- ES256 usa P-256; EdDSA usa Ed25519. `keys.py` armazena o escalar/semente de
-  32 bytes e deriva a chave pública COSE; **não** lê PKCS#8 diretamente.
-- `lookup()` tenta decifrar exclusivamente IDs locais. Um ID legítimo externo
-  será recusado, mesmo que seus metadados sejam colocados no arquivo.
-- Credenciais locais não descobríveis podem ser recuperadas sem um registro.
-  Uma credencial descobrível exige que seu registro ainda exista; a exclusão
-  revoga seu uso neste autenticador.
+- The v1 ID contains an encrypted private key: version, AES-GCM nonce, and CBOR
+  payload. Authenticated data includes the RP ID's SHA-256 hash.
+- HKDF-SHA256 derives separate wrapping and file keys. The historical labels
+  `ubuntu-passkey credential wrap` and `ubuntu-passkey store` are compatibility
+  invariants and must not be renamed.
+- ES256 uses P-256; EdDSA uses Ed25519. `keys.py` stores the 32-byte scalar/seed
+  and derives the COSE public key; it does **not** read PKCS#8 directly.
+- `lookup()` only attempts to decrypt local IDs. A legitimate external ID will
+  be rejected even if its metadata is inserted into the file.
+- Local non-discoverable credentials can be recovered without a record.
+  A discoverable credential requires its record to remain present; deletion
+  revokes its use in this authenticator.
 
-### Metadados e persistência
+### Metadata and persistence
 
-`credentials.enc` é um envelope AES-256-GCM com versão 1 e JSON cifrado. Contém
-`counter` e `credentials`; cada registro tem ID, RP, user handle, nomes,
-algoritmo, credProtect, datas e número de utilizações. Não há origem, conta
-remota, histórico de sincronização, estados BE/BS nem chave externa.
+`credentials.enc` is a version 1 AES-256-GCM envelope containing encrypted JSON.
+It contains `counter` and `credentials`; each record has an ID, RP, user handle,
+names, algorithm, credProtect, timestamps, and usage count. There is no source,
+remote account, synchronization history, BE/BS state, or external key.
 
-`CredentialStore._save()` usa `paths.atomic_write()`: temporário no mesmo
-diretório, modo 0600, flush, fsync do arquivo e `os.replace`. O temporário
-contém ciphertext. O diretório é criado com modo 0700. Há `RLock` dentro do
-processo, mas não há protocolo de múltiplos escritores entre processos.
+`CredentialStore._save()` uses `paths.atomic_write()`: a temporary file in the
+same directory, mode 0600, flush, file fsync, and `os.replace`. The temporary
+file contains ciphertext. The directory is created with mode 0700. There is an
+in-process `RLock`, but no protocol for multiple writers across processes.
 
-**Limitações relevantes para a importação:**
+**Limitations relevant to import:**
 
-1. `add_resident()` substitui registros com o mesmo RP ID e user handle,
-   inclusive com ID diferente. O teste `test_same_account_replaces_old_passkey`
-   confirma que isso é intencional para a criação local. Não reutilizar esse
-   método para importar: ele poderia apagar uma passkey preexistente.
-2. As mutações atuais acontecem antes de `_save()`. Uma falha de gravação pode
-   deixar a memória diferente do disco. Renomeação atômica não equivale a uma
-   transação de importação com rollback de memória.
-3. O fsync atual não abrange o diretório após a renomeação. Garantia de
-   durabilidade diante de queda de energia requer esse tratamento separado.
-4. `list()` e `record()` retornam cópias rasas dos registros. Não adicionar
-   material privado a estruturas que possam virar respostas públicas por
-   conveniência. A lista pública deve continuar usando uma projeção explícita.
+1. `add_resident()` replaces records with the same RP ID and user handle,
+   including those with a different ID. The test
+   `test_same_account_replaces_old_passkey` confirms this is intentional for
+   local creation. Do not reuse this method for import: it could delete an
+   existing passkey.
+2. Current mutations happen before `_save()`. A write failure can leave memory
+   different from disk. Atomic renaming is not an import transaction with
+   in-memory rollback.
+3. The current fsync does not cover the directory after renaming. Durability
+   guarantees against power loss require separate handling of that step.
+4. `list()` and `record()` return shallow copies of records. Do not add private
+   material to structures that might conveniently become public responses.
+   The public list must continue to use an explicit projection.
 
-### Chave mestra, exclusão e recuperação
+### Master key, deletion, and recovery
 
 [masterkey.py](../linux_passkey/masterkey.py), `MasterKeyManager`:
 
-- Prefere Secret Service/libsecret; o backend selecionado fica registrado em
-  `key-backend`. Backend de arquivo é fallback existente, em `master.key` 0600.
-- Se o backend registrado não está disponível, não gera uma chave substituta.
-  Isso evita invalidar silenciosamente as credenciais existentes.
-- O daemon fica disponível com erro de armazenamento e oferece nova tentativa.
-  Reset gira a chave e remove as credenciais; não faz parte da integração.
-- Bloquear posteriormente o chaveiro não elimina chaves já carregadas na
-  memória do daemon. O projeto não monitora esse bloqueio continuamente.
+- Prefers Secret Service/libsecret; the selected backend is recorded in
+  `key-backend`. The existing fallback is a file backend, `master.key`, mode 0600.
+- If the recorded backend is unavailable, it does not generate a replacement
+  key. This avoids silently invalidating existing credentials.
+- The daemon stays available with a storage error and offers retry. Reset
+  rotates the key and removes credentials; it is not part of the integration.
+- Subsequently locking the keyring does not remove keys already loaded in the
+  daemon's memory. The project does not continuously monitor that lock state.
 
-A integração não deve usar `reset()`, `rotate()` ou reconfigurar o backend para
-resolver problemas de autenticação Bitwarden. Excluir uma cópia importada não
-revoga a original no Bitwarden nem o cadastro no site.
+The integration must not use `reset()`, `rotate()`, or backend reconfiguration
+to solve Bitwarden authentication problems. Deleting an imported copy does not
+revoke the original in Bitwarden or its registration with the website.
 
-## 3. Assinaturas, flags, extensões e WebAuthn
+## 3. Signatures, flags, extensions, and WebAuthn
 
-[ctap2.py](../linux_passkey/ctap2.py), `_auth_data()` e `_assertion()`:
+[ctap2.py](../linux_passkey/ctap2.py), `_auth_data()` and `_assertion()`:
 
-- Há um contador global persistido, incrementado a cada geração de authData.
-  `use_count` é apenas uma estatística da interface, não o signCount WebAuthn.
-- As flags implementadas são UP, UV, AT e ED; BE/BS não são representadas.
-- A assinatura usa a chave recuperada e cobre authData + clientDataHash.
-- O user handle é devolvido a partir do registro. Nomes são condicionados à UV.
-- O seed hmac-secret/PRF pertence ao payload local; uma importação sem esse
-  segredo não pode inventá-lo e afirmar continuidade da extensão original.
-- `MAX_CRED_ID_LENGTH=128` é anunciado em GetInfo. O suporte a IDs externos
-  precisa revisar limites de entrada e anúncio, sem truncar ou trocar IDs.
+- A persisted global counter increments whenever authData is generated.
+  `use_count` is only a UI statistic, not the WebAuthn signCount.
+- Implemented flags are UP, UV, AT, and ED; BE/BS are not represented.
+- Signing uses the recovered key and covers authData + clientDataHash.
+- The user handle comes from the record. Names are conditional on UV.
+- The hmac-secret/PRF seed belongs to the local payload; an import without that
+  secret cannot invent it and claim continuity of the original extension.
+- GetInfo advertises `MAX_CRED_ID_LENGTH=128`. Supporting external IDs requires
+  reviewing input and advertised limits without truncating or replacing IDs.
 
 [WebAuthn Level 3](https://www.w3.org/TR/webauthn-3/#sctn-credential-backup)
-define BE como propriedade permanente e BS como estado atual; BS não pode ser
-verdadeiro quando BE é falso. O contador pode permanecer em zero quando o
-autenticador não fornece detecção por contador. Isso não autoriza reiniciar um
-contador não nulo arbitrariamente nem coordenar contadores entre cópias por
-meio de uma sincronização apenas de leitura.
+defines BE as a permanent property and BS as current state; BS cannot be true
+when BE is false. The counter may remain zero when the authenticator does not
+provide counter-based detection. This does not authorize arbitrarily resetting
+a nonzero counter or coordinating counters across copies through read-only
+synchronization.
 
-**Consequência:** credenciais copiadas do Bitwarden precisam de política
-própria comprovada de BE/BS e contador; não podem passar pelo caminho local
-inalterado e parecer credenciais device-bound. A política deve ser testada
-contra a semântica da versão do produtor, não deduzida apenas do nome do campo.
+**Consequence:** credentials copied from Bitwarden need their own verified
+BE/BS and counter policy; they cannot pass unchanged through the local path
+and appear to be device-bound credentials. Test the policy against the
+producer version's semantics, rather than inferring it from a field name alone.
 
-[webauthn.py](../linux_passkey/webauthn.py), `check_rp_id()`, `get()` e
-`has_credentials()`, permanece responsável por origem, PSL e clientDataJSON.
-O importador valida o RP do material importado, mas não substitui as checagens
-de origem de cada autenticação. O script de background usa a origem fornecida
-pelo navegador; frames cross-origin seguem para o navegador nativo.
+[webauthn.py](../linux_passkey/webauthn.py), `check_rp_id()`, `get()`, and
+`has_credentials()` remain responsible for origin, PSL, and clientDataJSON.
+The importer validates the RP in imported material but does not replace origin
+checks for each authentication. The background script uses the origin supplied
+by the browser; cross-origin frames are left to the native browser.
 
-## 4. Presença, biometria e limites de autorização
+## 4. Presence, biometrics, and authorization boundaries
 
-[broker.py](../linux_passkey/broker.py) seleciona um agente D-Bus ou abre o
-prompt GTK. O payload do prompt é enviado por stdin, não pela linha de comando.
-[verify.py](../linux_passkey/verify.py) executa `pkcheck` para a identidade do
-processo do daemon. A política instalada usa `auth_self` sem cache. Biometria
-depende do agente polkit e da configuração PAM/fprintd do sistema; não existe
-implementação biométrica própria.
+[broker.py](../linux_passkey/broker.py) selects a D-Bus agent or opens the GTK
+prompt. Its payload is sent through stdin rather than the command line.
+[verify.py](../linux_passkey/verify.py) runs `pkcheck` for the daemon process's
+identity. The installed policy uses uncached `auth_self`. Biometrics depend on
+the polkit agent and the system's PAM/fprintd configuration; the project has no
+biometric implementation of its own.
 
-[service.py](../linux_passkey/service.py) expõe a lista através de
-`describe_record()`, uma allowlist sem chaves privadas. O registro de agentes
-não é comprovação de identidade de um aplicativo: qualquer processo da sessão
-pode pedir registro. `DeleteCredential` não exige polkit; ResetAll exige a
-verificação configurada; as configurações D-Bus têm allowlist restrita.
-Esses comportamentos existentes não constituem autorização suficiente para
-uma nova operação de importação de chaves privadas.
+[service.py](../linux_passkey/service.py) exposes the list through
+`describe_record()`, an allowlist without private keys. Agent registration does
+not establish an application's identity: any process in the session can request
+registration. `DeleteCredential` does not require polkit; ResetAll requires the
+configured verification; D-Bus settings have a restricted allowlist. These
+existing behaviors are not sufficient authorization for a new private-key
+import operation.
 
-Para importar, são necessários consentimento específico sobre uma prévia
-imutável, identificação do remetente, expiração, confirmação não reutilizável e
-polkit obrigatório com falha fechada. Não aceitar `authorized=true` do cliente
-nem deixar `verification=none` autorizar importações. Validar limites e formato
-antes de carregar chaves, mas autorizar antes de persistir/usar o lote.
+Import requires specific consent to an immutable preview, sender identification,
+expiry, non-reusable confirmation, and mandatory polkit that fails closed.
+Do not accept `authorized=true` from the client or allow `verification=none`
+to authorize imports. Validate limits and format before loading keys, but
+authorize before persisting/using the batch.
 
-D-Bus é um IPC da sessão, não isolamento contra todos os processos do mesmo
-UID. Secret Service também não protege contra comprometimento total dessa
-sessão. O modelo de ameaças precisa declarar esse limite, sem prometer proteção
-contra root ou leitura arbitrária da memória do processo.
+D-Bus is session IPC, not isolation from all processes under the same UID.
+Secret Service also does not protect against total session compromise. The
+threat model must state this boundary without promising protection against
+root or arbitrary reads of process memory.
 
-## 5. GTK4, Niri e implantação
+## 5. GTK4, Niri, and deployment
 
-[app/window.py](../linux_passkey/app/window.py) usa `Adw.PreferencesPage` com
-grupos de passkeys, segurança e status. Não há hoje uma árvore de páginas de
-configuração ou integrações. O cliente [app/client.py](../linux_passkey/app/client.py)
-oferece métodos síncronos e `call_async()`. Mudanças de estado são atualizadas
-por sinais D-Bus e `GLib.idle_add`, sem polling contínuo da lista.
+[app/window.py](../linux_passkey/app/window.py) uses `Adw.PreferencesPage` with
+passkey, security, and status groups. There is currently no settings or
+integrations page hierarchy. The client
+[app/client.py](../linux_passkey/app/client.py) provides synchronous methods and
+`call_async()`. State changes are updated through D-Bus signals and
+`GLib.idle_add`, without continuously polling the list.
 
-A nova página deve reutilizar ActionRow, ComboRow, SwitchRow, AlertDialog,
-ToastOverlay e strings gettext; incluir nomes acessíveis, escape de markup de
-dados externos e operações assíncronas. Origem local/Bitwarden deve aparecer
-tanto na lista quanto nos detalhes. Não exibir chaves ou sessão em erros.
+The new page should reuse ActionRow, ComboRow, SwitchRow, AlertDialog,
+ToastOverlay, and gettext strings; include accessible names, escape markup in
+external data, and use asynchronous operations. Local/Bitwarden source should
+appear both in the list and in details. Never show keys or sessions in errors.
 
-No CachyOS/Niri, usar a janela de aprovação independente e um agente polkit da
-sessão. O GNOME Shell não é pré-requisito. Há Secret Service, GTK4/libadwaita e
-polkit instalados; `bw` não foi encontrado no PATH desta auditoria.
+On CachyOS/Niri, use the stand-alone approval window and a session polkit agent.
+GNOME Shell is not a prerequisite. Secret Service, GTK4/libadwaita, and polkit
+are installed; `bw` was not found in PATH during this audit.
 
-**Restrição de arquitetura confirmada:**
-[data/linux-passkey.service.in](../data/linux-passkey.service.in) restringe
-endereços a `AF_UNIX AF_NETLINK`. Um subprocesso `bw` herda o sandbox e não ganha
-acesso HTTPS. Sincronização no daemon não funcionará apenas adicionando uma
-thread ou variável de ambiente. A proposta é executar a parte de rede em um
-helper de sessão separado e manter as chaves locais no daemon; não ampliar
-silenciosamente as permissões do autenticador. O Snap exige análise própria
-de interfaces/empacotamento antes de declarar suporte.
+**Confirmed architecture restriction:**
+[data/linux-passkey.service.in](../data/linux-passkey.service.in) restricts
+address families to `AF_UNIX AF_NETLINK`. A `bw` subprocess inherits the sandbox
+and does not gain HTTPS access. Adding a thread or environment variable is
+not enough to make daemon-side synchronization work. The proposal is to run
+network access in a separate session helper and keep local keys in the daemon;
+do not silently broaden the authenticator's permissions. Snap requires its own
+interface/packaging analysis before claiming support.
 
-## 6. Mapa de alterações para as próximas fases
+## 6. Change map for subsequent phases
 
-Esta é uma proposta, não nomes de classes já existentes nem código implementado.
+This is a proposal, not existing class names or implemented code.
 
-| Responsável | Alteração mínima segura |
+| Owner | Minimum safe change |
 |---|---|
-| Adaptador Bitwarden | Detectar versão/capacidade do CLI, login oficial/MFA, estado de sessão, sync e leitura; saída limitada e erros sanitizados |
-| Autorização/sessão | Senha apenas durante operação, sessão volátil por padrão; persistência opt-in no Secret Service sem fallback em arquivo; desconexão e semântica de lock documentadas |
-| Mapper | JSON/CXF comprovado → dados normalizados, parsing PKCS#8 via `cryptography`, validação de ID/RP/handle/algoritmo/backup/extensões |
-| `CredentialStore` | Busca por ID externo + RP antes do unwrap local; chave externa cifrada; commit em lote, origem, idempotência e snapshot para rollback |
-| `Authenticator` | Flags e política de contador por credencial importada, preservando o caminho e valores das credenciais locais |
-| Importação/reconciliação | Prévia, rejeições por item, confirmação do lote exato; comparação por identidade criptográfica e origem; exclusões como conflito |
-| Scheduler | Um único timer GLib reagendável e um worker ativo; backoff limitado para rede; pausa por lock/expiração; cancelamento em disconnect |
-| D-Bus | Somente estado/resumos públicos; operações privilegiadas com autorização; não adicionar retorno de sessão/chave privada |
-| GTK | Integrações → Bitwarden: conta, estado, ações, prévia, conflitos, frequência, última execução e histórico |
-| Empacotamento/documentação | CLI opcional, helper de rede e instruções Arch/Niri; atualizar `po/POTFILES` se houver novos módulos de interface |
+| Bitwarden adapter | Detect CLI version/capabilities, official login/MFA, session state, sync, and reading; bounded output and sanitized errors |
+| Authorization/session | Password only during the operation, volatile session by default; opt-in Secret Service persistence without file fallback; documented disconnect and lock semantics |
+| Mapper | Verified JSON/CXF → normalized data, PKCS#8 parsing through `cryptography`, ID/RP/handle/algorithm/backup/extension validation |
+| `CredentialStore` | External ID + RP lookup before local unwrap; encrypted external key; batch commit, source, idempotency, and rollback snapshot |
+| `Authenticator` | Flags and counter policy per imported credential, preserving local credentials' path and values |
+| Import/reconciliation | Preview, per-entry rejection, confirmation of the exact batch; comparison by cryptographic identity and source; deletions treated as conflicts |
+| Scheduler | One reschedulable GLib timer and one active worker; bounded network backoff; pause on lock/expiry; cancel on disconnect |
+| D-Bus | Public state/summaries only; authorized privileged operations; no session/private-key return values |
+| GTK | Integrations → Bitwarden: account, state, actions, preview, conflicts, frequency, last run, and history |
+| Packaging/documentation | Optional CLI, network helper, and Arch/Niri instructions; update `po/POTFILES` if UI modules are added |
 
-Não há justificativa para novo banco SQL, outra implementação AES ou um
-framework genérico de provedores neste momento. O material criptográfico
-continua sob o mecanismo existente; `cryptography` já fornece parsing PKCS#8.
-Para as cópias importadas, exigir o backend keyring disponível; não alterar o
-fallback já existente para as passkeys locais nem apresentar uma chave em
-arquivo como proteção pelo keyring. Essa condição deve aparecer na prévia.
+There is no justification for a new SQL database, another AES implementation,
+or a generic provider framework at this point. Cryptographic material remains
+under the existing mechanism; `cryptography` already provides PKCS#8 parsing.
+Require an available keyring backend for imported copies; do not change the
+existing fallback for local passkeys or present a file-based key as keyring
+protection. This condition must appear in the preview.
 
-## 7. Modelo de dados e migração proposta
+## 7. Proposed data model and migration
 
-Manter o envelope AES-GCM e os rótulos HKDF. O leitor novo aceita arquivos v1;
-os registros v1 são tratados como `source=local` sem reescrever seus IDs.
-Somente o primeiro commit que precisa de dados externos ativa a versão nova.
+Keep the AES-GCM envelope and HKDF labels. The new reader accepts v1 files;
+v1 records are treated as `source=local` without rewriting their IDs. Only the
+first commit requiring external data activates the new version.
 
-Um registro externo precisa conservar ID original binário (codificado de forma
-canônica para índice), RP, user handle, chave/algoritmo normalizados, origem
-`bitwarden`, vínculo de conta/servidor/item remoto, BE/BS, política de contador,
-datas e revisão remota. Histórico, estado de reconciliação e dados sensíveis de
-conta ficam no conteúdo cifrado; preferências não secretas podem ficar no
-Config existente. Senha mestra e tokens não entram nesse arquivo.
+An external record must preserve the original binary ID (canonically encoded
+for indexing), RP, user handle, normalized key/algorithm, `bitwarden` source,
+remote account/server/item linkage, BE/BS, counter policy, timestamps, and remote
+revision. History, reconciliation state, and sensitive account data belong
+inside the encrypted contents; non-secret preferences can remain in the
+existing Config. Master passwords and tokens do not belong in this file.
 
-**Não sobrescrever uma entrada por igualdade de RP+usuário.** A mesma identidade
-com chave ou RP diferente é conflito. Mesmo ID/chave/RP é idempotente; se já é
-local, a importação não assume posse da credencial. Alterações de nomes remotos
-não devem sobrescrever estatísticas de uso, contadores ou overrides locais.
+**Do not overwrite an entry merely because RP+user match.** The same identity
+with a different key or RP is a conflict. The same ID/key/RP is idempotent;
+if already local, import does not take ownership of that credential. Remote
+name changes must not overwrite usage statistics, counters, or local overrides.
 
-| Etapa | Escritores/leitores e recuperação |
+| Stage | Writers/readers and recovery |
 |---|---|
-| Expandir | Novo leitor entende v1 e v2; v1 continua utilizável sem importação; teste com fixtures do código original |
-| Preparar | Validar lote completo em memória; prévia vinculada à revisão do store; snapshot cifrado com a chave existente; um escritor |
-| Commit | Revalidar revisão sob lock; cifrar candidato; escrever/renomear atomicamente; trocar estado em memória apenas após sucesso; emitir sinal após commit |
-| Verificar | Reabrir o arquivo, autenticar credencial local antiga e externa fictícia, demonstrar negação por RP errado e ausência de chave em D-Bus |
-| Rollback | Antes do commit, descartar candidato; após commit, restaurar snapshot somente com daemon parado e sem descartar mudanças posteriores sem consentimento |
+| Expand | New reader understands v1 and v2; v1 stays usable without import; test with fixtures from the original code |
+| Prepare | Validate the full batch in memory; bind preview to the store revision; encrypted snapshot under the existing key; one writer |
+| Commit | Revalidate revision under lock; encrypt candidate; write/rename atomically; replace in-memory state only after success; signal after commit |
+| Verify | Reopen the file, authenticate an old local credential and a synthetic external one, demonstrate wrong-RP rejection and no keys exposed through D-Bus |
+| Rollback | Before commit, discard candidate; after commit, restore snapshot only with the daemon stopped and without discarding later changes without consent |
 
-**Limite de downgrade:** o binário original não sabe usar IDs externos e pode
-substituir registros do mesmo RP/usuário. Não executar versões antigas e novas
-como escritores concorrentes. Um formato v2 deve falhar fechado no original.
-Isso preserva credenciais antigas no programa novo, mas não promete que o
-programa original consiga usar passkeys importadas. Não existe migração
-destrutiva ou contração autorizada nesta etapa.
+**Downgrade boundary:** the original binary cannot use external IDs and can
+replace records for the same RP/user. Do not run old and new versions as
+concurrent writers. A v2 format must fail closed in the original program.
+This preserves old credentials in the new program but does not promise that
+the original program can use imported passkeys. No destructive migration or
+contraction is authorized at this stage.
 
-## 8. Sincronização e estados propostos
+## 8. Proposed synchronization and states
 
-Manual, ao iniciar o aplicativo, 15/30/60 minutos ou desativada. O agendamento
-periódico pertence a um proprietário de sessão definido, não a cada janela;
-abrir duas janelas não cria dois workers. O modo ao iniciar o aplicativo deve
-significar ativação do aplicativo, não cada refresh da página.
+Manual, on application startup, every 15/30/60 minutes, or disabled. Periodic
+scheduling belongs to a defined session owner rather than each window;
+opening two windows must not create two workers. Startup mode must mean
+application activation, not every page refresh.
 
-Fluxo: verificar disponibilidade e sessão → sync remoto completo → leitura e
-validação → prévia na primeira execução → confirmação → commit transacional →
-histórico sanitizado. Nenhuma alteração remota é inferida se sync/leitura falha.
-Importação manual de arquivo parcial **não** representa um snapshot remoto
-completo e não pode gerar exclusões.
+Flow: check availability and session → complete remote sync → read and validate
+→ preview on the first run → confirmation → transactional commit → sanitized
+history. Do not infer remote changes when sync/reading fails. Manual import
+of a partial file is **not** a complete remote snapshot and cannot generate
+deletions.
 
-Estados distinguíveis: indisponível, desconectado, autenticação/MFA necessária,
-aguardando desbloqueio, pronto, sincronizando, rede indisponível, sessão expirada,
-formato incompatível e conflitos. Lock/expiração suspendem operações até ação
-válida do usuário; não abrem prompts repetidamente pelo timer.
+Distinct states: unavailable, disconnected, authentication/MFA required, waiting
+for unlock, ready, synchronizing, network unavailable, session expired,
+incompatible format, and conflicts. Lock/expiry suspend operations until valid
+user action; timers must not open repeated authentication prompts.
 
-Remoções remotas geram divergência e nunca apagam automaticamente. Exclusão
-local deixa supressão vinculada à origem para que o próximo sync não ressuscite
-a cópia sem decisão explícita. Desconectar remove autorização e cancela jobs;
-remover cópias já importadas é uma decisão separada. Não há fluxo de escrita
-para o Bitwarden.
+Remote removals produce a divergence and never delete automatically. Local
+deletion leaves source-linked suppression so the next sync does not resurrect
+the copy without an explicit decision. Disconnect removes authorization and
+cancels jobs; removing already imported copies is a separate decision. There
+is no write-back flow to Bitwarden.
 
-Bloqueio de acesso remoto não é automaticamente revogação das cópias locais.
-Se o produto quiser bloquear também autenticações locais dessas cópias, isso
-exige política explícita e observação confiável de lock. Polkit local não
-substitui desbloqueio criptográfico do Bitwarden.
+Locking remote access does not automatically revoke local copies. If the
+product should also block local authentication with those copies, it needs
+an explicit policy and reliable lock observation. Local polkit does not
+replace Bitwarden's cryptographic unlock.
 
-## 9. Testes antes da implementação
+## 9. Tests before implementation
 
-Usar pytest, temporários XDG e credenciais geradas para teste, como a suíte
-atual. Mocks do CLI testam o contrato, mas não provam compatibilidade com um
-cofre Bitwarden. O teste de contrato real precisa de conta/cofre descartável
-autorizado e versão fixada do CLI; nunca da conta pessoal do usuário.
+Use pytest, temporary XDG locations, and credentials generated for testing,
+as in the current suite. CLI mocks test the contract but do not establish
+compatibility with a Bitwarden vault. A real contract test needs an authorized
+disposable account/vault and a pinned CLI version, never the user's personal
+account.
 
-| Grupo | Provas exigidas para liberar a implementação |
+| Group | Proof required to release the implementation |
 |---|---|
-| Auth | Login válido/inválido, MFA, expiração, lock, reconexão/disconnect; inspeção de argv/env/logs/arquivos; sessão persistida somente após opt-in |
-| Mapper | ES256; EdDSA apenas se o produtor suportar; ID UUID/raw conforme código oficial; chave PKCS#8 inválida, curva/algoritmo incompatível, RP/handle ausentes, backup inconsistente |
-| Store | ID externo original; RP incorreto; arquivo v1 existente; duplicatas/conflitos; mesma conta com credenciais locais; rollback de memória/disco; fsync/rename negados; nenhum temporário privado |
-| Sync | Primeiro lote com prévia; sem mudanças; novo item; metadados; remoção remota; exclusão local; partial snapshot; falha de rede; concorrência; expiração; interrupção antes/depois de commit |
-| WebAuthn | `Fido2Server` conhece a chave pública de teste antes da importação; autenticação via `webauthn.get` e CTAPHID valida ID original, RP, assinatura, UP/UV, BE/BS e contador; negar origem adversária |
-| D-Bus | Caller sem autorização não importa; token de confirmação errado/expirado/de outro sender falha; lista/status/histórico não expõem material privado; cancelamento desconecta operação |
-| UI | Estados, prévia, acessibilidade, erro sanitizado, conta e origem; nenhuma operação de rede bloqueia GTK |
+| Auth | Valid/invalid login, MFA, expiry, lock, reconnect/disconnect; inspect argv/env/logs/files; session persisted only after opt-in |
+| Mapper | ES256; EdDSA only if supported by the producer; UUID/raw IDs according to official code; invalid PKCS#8 key, incompatible curve/algorithm, missing RP/handle, inconsistent backup state |
+| Store | Original external ID; wrong RP; existing v1 file; duplicates/conflicts; same account with local credentials; memory/disk rollback; fsync/rename denied; no private temporary files |
+| Sync | First batch with preview; no changes; new item; metadata; remote removal; local deletion; partial snapshot; network failure; concurrency; expiry; interruption before/after commit |
+| WebAuthn | `Fido2Server` knows the test public key before import; authentication through `webauthn.get` and CTAPHID validates original ID, RP, signature, UP/UV, BE/BS, and counter; reject hostile origins |
+| D-Bus | Unauthorized caller cannot import; wrong/expired/other-sender confirmation token fails; list/status/history expose no private material; cancellation disconnects the operation |
+| UI | States, preview, accessibility, sanitized errors, account, and source; no network operation blocks GTK |
 
-O oráculo WebAuthn deve ser independente: construir o registro do servidor a
-partir da chave pública da fixture, sem usar `store.create()` nem substituir
-uma chave importada por chave recém-gerada. Testar cópias usadas por dois
-autenticadores; não validar apenas o caminho feliz de uma assinatura.
+The WebAuthn oracle must be independent: construct the server record from the
+fixture's public key, without using `store.create()` or replacing an imported
+key with a newly generated one. Test copies used by two authenticators;
+do not validate only a signature's happy path.
 
-## 10. Verificação desta etapa
+## 10. Verification at this stage
 
-- `make check`: **129 testes passaram**, incluindo dois testes de Firefox XDG
-  produzidos na tarefa anterior. Há 27 avisos de depreciação GLib/PyGObject,
-  sem falhas. Os testes D-Bus precisaram executar fora do sandbox para criar
-  seu barramento privado.
-- `make lint`: **passou** após instalar pyflakes e permitir o download do
-  ESLint 9.15.0 pelo alvo existente. AppStream, desktop-file, Python,
-  JavaScript e política polkit foram validados. Avisos: versão do ESLint
-  depreciada e referência externa do DTD polkit indisponível; `xmllint` usou
-  o DTD local explicitamente indicado pelo Makefile e retornou sucesso.
-- Nenhum teste de importação ou autenticação Bitwarden foi criado/executado:
-  a fase de testes da feature ainda não começou.
-- Dependência de desenvolvimento `pyflakes` instalada apenas na `.venv` para
-  executar o alvo de lint. Nenhuma dependência de runtime foi adicionada.
-- `linux_passkey/browsers.py` e `tests/test_nativehost.py` já estavam modificados
-  pela correção anterior de Firefox; não são implementação Bitwarden.
-- Não houve migração, exclusão, alteração de IDs/chaves nem escrita no cofre
-  Bitwarden. O programa instalado continua com seu comportamento existente.
+- `make check`: **129 tests passed**, including two Firefox XDG tests produced
+  in the previous task. There were 27 GLib/PyGObject deprecation warnings and
+  no failures. D-Bus tests needed to run outside the sandbox to create their
+  private bus.
+- `make lint`: **passed** after installing pyflakes and allowing the existing
+  target to download ESLint 9.15.0. AppStream, desktop-file, Python, JavaScript,
+  and the polkit policy were validated. Warnings: deprecated ESLint version
+  and unavailable external polkit DTD reference; `xmllint` used the local DTD
+  explicitly selected by the Makefile and returned success.
+- No Bitwarden import or authentication tests were created/run: the feature's
+  test phase had not started yet.
+- The development dependency `pyflakes` was installed only in `.venv` to run
+  the lint target. No runtime dependency was added.
+- `linux_passkey/browsers.py` and `tests/test_nativehost.py` were already modified
+  by the preceding Firefox fix; they are not a Bitwarden implementation.
+- There was no migration, deletion, ID/key change, or write to the Bitwarden
+  vault. The installed program retained its existing behavior.
 
-Próxima etapa técnica: fechar o contrato de sessão/lock e persistência do CLI
-com as evidências externas, selecionar a alternativa que cumpre os requisitos
-de segurança e escrever seus testes de aceitação antes de qualquer mudança
-no armazenamento.
+Next technical step: finalize the CLI session/lock and persistence contract
+using the external evidence, choose the alternative that meets the security
+requirements, and write its acceptance tests before changing storage.
