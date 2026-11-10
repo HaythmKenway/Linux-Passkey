@@ -123,6 +123,11 @@ class Daemon:
 
     def reset(self):
         """Delete every passkey and replace the master key."""
+        with self._lock:
+            self._reset()
+
+    def _reset(self):
+        """Reset while excluding a concurrent authorized import."""
         key = self.keys.rotate()
         if self.store is not None:
             self.store.reset(key)

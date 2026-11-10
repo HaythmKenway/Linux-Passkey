@@ -140,6 +140,23 @@ def test_register_browsers(tmp_path, monkeypatch):
     assert browsers.register("/usr/libexec/linux-passkey/native-host", home=str(home)) == []
 
 
+@pytest.mark.parametrize("custom_config", [False, True])
+def test_register_firefox_xdg(tmp_path, monkeypatch, custom_config):
+    home = tmp_path / "home"
+    config = home / ("settings" if custom_config else ".config")
+    profile = config / "mozilla" / "firefox"
+    profile.mkdir(parents=True)
+    (profile / "profiles.ini").write_text("[General]\n")
+    monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
+    if custom_config:
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(config))
+    written = browsers.register("/usr/local/libexec/linux-passkey/native-host", home=str(home))
+    manifest = config / "mozilla/native-messaging-hosts" / (browsers.HOST_NAME + ".json")
+    assert written == [str(manifest)]
+    assert json.loads(manifest.read_text())["allowed_extensions"] == [browsers.FIREFOX_EXTENSION_ID]
+    assert browsers.register("/usr/local/libexec/linux-passkey/native-host", home=str(home)) == []
+
+
 def test_register_browsers_from_a_snap(tmp_path, monkeypatch):
     real = tmp_path / "real"
     (real / ".config" / "google-chrome").mkdir(parents=True)

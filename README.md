@@ -155,6 +155,17 @@ To sign in, choose **Sign in with a passkey** and approve the prompt. If you hav
 
 Open **Passkeys** from the app grid to view or delete passkeys. Deleting a passkey revokes it straight away.
 
+### Importing Bitwarden passkeys
+
+Open **Settings → Integrations → Bitwarden → Choose JSON…** to preview an
+official, unencrypted Bitwarden JSON export. Compatible ES256 passkeys retain
+their original IDs and keys; importing requires the login keyring, approval,
+and system authentication. These are independent local copies. Account login
+and automatic synchronization are not available yet.
+
+See [Bitwarden import and security](docs/BITWARDEN-IMPORT.md) for supported
+formats, installation on Arch/CachyOS with Niri, conflicts, and rollback.
+
 ## How it works
 
 ```
@@ -219,6 +230,11 @@ passkeyd --verbose          # run in the foreground (stop the service first)
 
 ## Development
 
+Bitwarden JSON import is implemented; connected synchronization remains under investigation.
+See the [architecture and compatibility audit](docs/BITWARDEN-AUDIT.md) and
+[official interface findings](docs/BITWARDEN-INTERFACES.md) for feasibility,
+security blockers, and the proposed implementation and test plan.
+
 ```sh
 make check        # unit, CTAPHID, D-Bus, fuzz and end-to-end WebAuthn tests (python-fido2 client + server)
 make lint         # pyflakes, ESLint, desktop-file, AppStream and polkit validation
@@ -242,6 +258,7 @@ Bus name `io.github.haythmkenway.Passkey.Daemon`, object `/io/github/haythmkenwa
 | `Respond(u id, b approved, i choice)` | Answer a prompt (registered agents only) |
 | `GetPendingRequests() → a(usssasb)` | Prompts waiting for an answer |
 | `ListCredentials() → aa{sv}`, `DeleteCredential(s id) → b` | Manage passkeys |
+| `ImportBitwarden(h sealed_export) → u` | Import a sealed memfd containing an official JSON export; requires keyring, explicit approval and system verification; returns only the added count |
 | `ResetAll() → b` | Delete everything (requires verification) |
 | `Retry()` | Try to open the passkey storage again (after unlocking the keyring) |
 | `WebAuthnCreate(s origin, s top_origin, s options, s handle) → s`, `WebAuthnGet(…) → s` | `navigator.credentials.create()` / `get()` with WebAuthn JSON options and results; errors are `io.github.haythmkenway.Passkey.WebAuthn.<DOMException name>` |
